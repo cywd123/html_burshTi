@@ -78,6 +78,8 @@
     .controls {
       display: flex;
       gap: 15px;
+      flex-wrap: wrap;
+      margin-top: 20px;
     }
     button {
       padding: 12px 24px;
@@ -105,6 +107,34 @@
     .next-btn:hover {
       background-color: #218838;
     }
+    .collect-btn {
+      background-color: #ffc107;
+      color: #333;
+    }
+    .collect-btn:hover {
+      background-color: #e0a800;
+    }
+    .collect-btn.collected {
+      background-color: #dc3545;
+      color: white;
+    }
+    .collect-btn.collected:hover {
+      background-color: #c82333;
+    }
+    .reset-btn {
+      background-color: #6c757d;
+      color: white;
+    }
+    .reset-btn:hover {
+      background-color: #5a6268;
+    }
+    .collect-list-btn {
+      background-color: #17a2b8;
+      color: white;
+    }
+    .collect-list-btn:hover {
+      background-color: #138496;
+    }
     .result-message {
       margin-top: 15px;
       padding: 10px;
@@ -129,15 +159,93 @@
       color: #666;
       margin-bottom: 10px;
     }
+    .header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background-color: white;
+      border-radius: 10px;
+      padding: 30px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .close-btn {
+      background-color: #dc3545;
+      color: white;
+      padding: 8px 16px;
+      font-size: 0.9em;
+    }
+    .collect-item {
+      padding: 15px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .collect-item:hover {
+      background-color: #f8f9fa;
+      border-color: #007bff;
+    }
+    .back-btn {
+      background-color: #6c757d;
+      color: white;
+      margin-top: 20px;
+    }
+    .back-btn:hover {
+      background-color: #5a6268;
+    }
   </style>
 </head>
 <body>
   <div id="app">
-    <h1>在线刷题</h1>
+    <div class="header-actions">
+      <h1>在线刷题</h1>
+      <div>
+        <button @click="showCollectList" class="collect-list-btn">我的收藏</button>
+        <button @click="resetProgress" class="reset-btn">重置进度</button>
+      </div>
+    </div>
+    
     <div class="progress">第 {{ currentQuestionIndex + 1 }} 题 / 共 {{ questions.length }} 题</div>
 
-    <div class="question-container" v-if="currentQuestion">
-      <div class="question-title">{{ currentQuestion.question }}</div>
+    <div class="question-container" v-if="currentQuestion && !showCollectModal">
+      <div class="question-title">
+        {{ currentQuestion.question }}
+        <button 
+          @click="toggleCollect" 
+          class="collect-btn"
+          :class="{ collected: isCollected }"
+          style="margin-left: 10px; padding: 6px 12px; font-size: 0.8em;"
+        >
+          {{ isCollected ? '取消收藏' : '收藏题目' }}
+        </button>
+      </div>
 
       <div class="options-container">
         <label 
@@ -161,28 +269,57 @@
         </label>
       </div>
 
-      <div v-if="!showResult">
-        <button @click="submitAnswer" class="submit-btn" :disabled="!selectedOption">提交答案</button>
-      </div>
+      <div class="controls">
+        <div v-if="!showResult">
+          <button @click="submitAnswer" class="submit-btn" :disabled="!selectedOption">提交答案</button>
+        </div>
 
-      <div v-if="showResult">
-        <div class="result-message" :class="isCorrect ? 'result-correct' : 'result-incorrect'">
-          {{ isCorrect ? '回答正确！' : '回答错误！' }}
+        <div v-if="showResult">
+          <div class="result-message" :class="isCorrect ? 'result-correct' : 'result-incorrect'">
+            {{ isCorrect ? '回答正确！' : '回答错误！' }}
+          </div>
+          <div class="explanation">
+            <strong>解析：</strong>{{ currentQuestion.explanation }}
+          </div>
+          <button @click="nextQuestion" class="next-btn">下一题</button>
         </div>
-        <div class="explanation">
-          <strong>解析：</strong>{{ currentQuestion.explanation }}
-        </div>
-        <button @click="nextQuestion" class="next-btn">下一题</button>
       </div>
     </div>
 
-    <div v-else>
+    <div v-else-if="!showCollectModal">
       <p>题目库为空或已完成所有题目！</p>
+      <button @click="resetProgress" class="reset-btn">重新开始</button>
+    </div>
+
+    <!-- 收藏列表弹窗 -->
+    <div class="modal" v-if="showCollectModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>我的收藏题目</h2>
+          <button @click="closeCollectModal" class="close-btn">关闭</button>
+        </div>
+        
+        <div v-if="collectedQuestions.length > 0">
+          <div 
+            v-for="(question, index) in collectedQuestions" 
+            :key="index"
+            class="collect-item"
+            @click="goToCollectedQuestion(index)"
+          >
+            <strong>第{{ question.index + 1 }}题：</strong>{{ question.question }}
+          </div>
+        </div>
+        <div v-else>
+          <p>暂无收藏的题目</p>
+        </div>
+        
+        <button @click="closeCollectModal" class="back-btn">返回刷题</button>
+      </div>
     </div>
   </div>
 
   <script>
-    const { createApp, ref, computed } = Vue;
+    const { createApp, ref, computed, watch } = Vue;
 
     createApp({
       setup() {
@@ -220,19 +357,57 @@
           },
         ]);
 
-        const currentQuestionIndex = ref(0);
-        const selectedOption = ref(null); // 存储用户选择的答案
-        const showResult = ref(false); // 控制是否显示结果
-        const isCorrect = ref(null); // 存储答案是否正确
+        // ========== 本地存储相关 ==========
+        // 从本地存储加载进度
+        const loadProgress = () => {
+          const savedIndex = localStorage.getItem('questionProgressIndex');
+          const savedCollected = localStorage.getItem('collectedQuestions');
+          
+          if (savedIndex !== null) {
+            currentQuestionIndex.value = parseInt(savedIndex);
+          }
+          
+          if (savedCollected) {
+            collectedQuestions.value = JSON.parse(savedCollected);
+          }
+        };
 
+        // 保存进度到本地存储
+        const saveProgress = () => {
+          localStorage.setItem('questionProgressIndex', currentQuestionIndex.value);
+        };
+
+        // 保存收藏题目到本地存储
+        const saveCollectedQuestions = () => {
+          localStorage.setItem('collectedQuestions', JSON.stringify(collectedQuestions.value));
+        };
+
+        // ========== 响应式数据 ==========
+        const currentQuestionIndex = ref(0);
+        const selectedOption = ref(null);
+        const showResult = ref(false);
+        const isCorrect = ref(null);
+        const collectedQuestions = ref([]); // 收藏的题目列表
+        const showCollectModal = ref(false); // 收藏列表弹窗显示状态
+
+        // ========== 计算属性 ==========
         // 获取当前题目
         const currentQuestion = computed(() => {
-            if (questions.value.length > 0 && currentQuestionIndex.value < questions.value.length) {
-                return questions.value[currentQuestionIndex.value];
-            }
-            return null; // 如果索引超出范围，返回null
+          if (questions.value.length > 0 && currentQuestionIndex.value < questions.value.length) {
+            return questions.value[currentQuestionIndex.value];
+          }
+          return null;
         });
 
+        // 判断当前题目是否已收藏
+        const isCollected = computed(() => {
+          if (!currentQuestion.value) return false;
+          return collectedQuestions.value.some(
+            item => item.index === currentQuestionIndex.value
+          );
+        });
+
+        // ========== 方法 ==========
         // 根据索引生成选项标签 (A, B, C, D)
         const getOptionKey = (index) => {
           return String.fromCharCode(65 + index); // 65 is ASCII for 'A'
@@ -252,11 +427,79 @@
         // 下一题
         const nextQuestion = () => {
           currentQuestionIndex.value++;
+          // 保存进度
+          saveProgress();
           // 重置答题状态
           selectedOption.value = null;
           showResult.value = false;
           isCorrect.value = null;
         };
+
+        // 收藏/取消收藏题目
+        const toggleCollect = () => {
+          if (!currentQuestion.value) return;
+          
+          const index = collectedQuestions.value.findIndex(
+            item => item.index === currentQuestionIndex.value
+          );
+          
+          if (index > -1) {
+            // 取消收藏
+            collectedQuestions.value.splice(index, 1);
+          } else {
+            // 添加收藏
+            collectedQuestions.value.push({
+              index: currentQuestionIndex.value,
+              ...currentQuestion.value
+            });
+          }
+          
+          // 保存收藏数据
+          saveCollectedQuestions();
+        };
+
+        // 显示收藏列表
+        const showCollectList = () => {
+          showCollectModal.value = true;
+        };
+
+        // 关闭收藏列表
+        const closeCollectModal = () => {
+          showCollectModal.value = false;
+        };
+
+        // 跳转到收藏的题目
+        const goToCollectedQuestion = (index) => {
+          const question = collectedQuestions.value[index];
+          currentQuestionIndex.value = question.index;
+          // 保存进度
+          saveProgress();
+          // 重置答题状态
+          selectedOption.value = null;
+          showResult.value = false;
+          isCorrect.value = null;
+          // 关闭弹窗
+          closeCollectModal();
+        };
+
+        // 重置做题进度
+        const resetProgress = () => {
+          currentQuestionIndex.value = 0;
+          selectedOption.value = null;
+          showResult.value = false;
+          isCorrect.value = null;
+          // 保存重置后的进度
+          saveProgress();
+        };
+
+        // ========== 监听与初始化 ==========
+        // 监听题目索引变化，自动保存进度
+        watch(currentQuestionIndex, () => {
+          saveProgress();
+        });
+
+        // 初始化加载进度
+        loadProgress();
 
         return {
           questions,
@@ -265,9 +508,17 @@
           selectedOption,
           showResult,
           isCorrect,
+          collectedQuestions,
+          showCollectModal,
+          isCollected,
           submitAnswer,
           nextQuestion,
           getOptionKey,
+          toggleCollect,
+          showCollectList,
+          closeCollectModal,
+          goToCollectedQuestion,
+          resetProgress
         };
       },
     }).mount("#app");
