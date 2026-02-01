@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>医学在线刷题软件</title>
+  <title>医学在线刷题软件 - GitHub题库版</title>
   <!-- 引入 Vue 3 的 CDN 链接 -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -27,6 +27,105 @@
       padding: 30px;
       box-sizing: border-box;
       margin-top: 20px;
+    }
+    /* GitHub配置面板样式 */
+    .github-config {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 25px;
+      border: 1px solid #eee;
+    }
+    .config-title {
+      font-size: 1.1em;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .config-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .form-label {
+      font-size: 0.95em;
+      color: #444;
+      font-weight: 500;
+    }
+    .form-input {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1em;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    }
+    .config-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .load-btn {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    .load-btn:hover {
+      background-color: #0056b3;
+    }
+    .load-btn:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .reset-config-btn {
+      background-color: #6c757d;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    .reset-config-btn:hover {
+      background-color: #5a6268;
+    }
+    .loading {
+      color: #007bff;
+      font-size: 0.95em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .error-message {
+      color: #dc3545;
+      font-size: 0.95em;
+      padding: 10px;
+      background-color: #ffebee;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    .success-message {
+      color: #28a745;
+      font-size: 0.95em;
+      padding: 10px;
+      background-color: #e8f5e9;
+      border-radius: 6px;
+      margin-top: 10px;
     }
     /* 顶部头部与操作区 */
     .app-header {
@@ -54,7 +153,7 @@
       margin-bottom: 25px;
       flex-wrap: wrap;
     }
-    /* 分类筛选栏 - 新增折叠样式 */
+    /* 分类筛选栏 - 折叠样式 */
     .category-list {
       min-width: 200px;
       width: 22%;
@@ -429,193 +528,260 @@
       .question-meta {
         gap: 10px;
       }
+      .config-form {
+        gap: 10px;
+      }
     }
   </style>
 </head>
 <body>
   <div id="app">
-    <div class="app-header">
-      <div class="header-top">
-        <h1>医学在线刷题</h1>
-        <div class="header-actions">
-          <button @click="showCollectList" class="collect-list-btn">我的收藏</button>
-          <button @click="resetProgress" class="reset-btn">重置进度</button>
+    <!-- GitHub仓库配置面板（新增核心功能） -->
+    <div class="github-config">
+      <div class="config-title">GitHub题库配置</div>
+      <div class="config-form">
+        <div class="form-group">
+          <label class="form-label">GitHub仓库地址（格式：owner/repo，如：username/medical-questions）</label>
+          <input 
+            v-model="githubRepo" 
+            type="text" 
+            class="form-input" 
+            placeholder="请输入仓库地址，例如：octocat/medical-questions"
+          />
         </div>
-      </div>
-      <div class="progress">
-        当前分类：{{ activeCategoryName }} | 第 {{ currentQuestionIndex + 1 }} 题 / 共 {{ filterQuestions.length }} 题
+        <div class="form-group">
+          <label class="form-label">GitHub Personal Access Token（用于访问私有仓库，公仓可留空）</label>
+          <input 
+            v-model="githubToken" 
+            type="password" 
+            class="form-input" 
+            placeholder="请输入你的GitHub Token（repo权限）"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">题库文件路径（可选，默认根目录，如：questions/medical/）</label>
+          <input 
+            v-model="githubPath" 
+            type="text" 
+            class="form-input" 
+            placeholder="仓库中题目文件所在路径，例如：questions/medical/"
+          />
+        </div>
+        <div class="config-actions">
+          <button 
+            @click="loadQuestionsFromGitHub" 
+            class="load-btn"
+            :disabled="loading || !githubRepo"
+          >
+            {{ loading ? '加载中...' : '加载题库' }}
+          </button>
+          <button @click="resetConfig" class="reset-config-btn">重置配置</button>
+        </div>
+        <div v-if="loading" class="loading">
+          <span>🔄 正在从GitHub加载题目，请稍候...</span>
+        </div>
+        <div v-if="errorMsg" class="error-message">
+          ❌ {{ errorMsg }}
+        </div>
+        <div v-if="successMsg" class="success-message">
+          ✅ {{ successMsg }}
+        </div>
       </div>
     </div>
 
-    <!-- 题目分类 + 题目列表 导航区 -->
-    <div class="question-nav">
-      <!-- 分类筛选：科目+单元二级分类（新增折叠功能） -->
-      <div class="category-list">
-        <div class="category-title">题目分类</div>
-        <!-- 全部题目 -->
-        <div 
-          class="category-item"
-          :class="{ active: activeCategory === 'all' }"
-          @click="switchCategory('all')"
-        >
-          <span>全部题目 ({{ questions.length }})</span>
+    <!-- 刷题核心区域（题库加载成功后显示） -->
+    <div v-if="questionsLoaded">
+      <div class="app-header">
+        <div class="header-top">
+          <h1>医学在线刷题 (GitHub题库)</h1>
+          <div class="header-actions">
+            <button @click="showCollectList" class="collect-list-btn">我的收藏</button>
+            <button @click="resetProgress" class="reset-btn">重置进度</button>
+          </div>
         </div>
-        <!-- 科目一级分类（可折叠） -->
-        <div v-for="(subject, key) in subjectCategories" :key="key">
+        <div class="progress">
+          当前分类：{{ activeCategoryName }} | 第 {{ currentQuestionIndex + 1 }} 题 / 共 {{ filterQuestions.length }} 题
+        </div>
+      </div>
+
+      <!-- 题目分类 + 题目列表 导航区 -->
+      <div class="question-nav">
+        <!-- 分类筛选：科目+单元二级分类（可折叠） -->
+        <div class="category-list">
+          <div class="category-title">题目分类</div>
+          <!-- 全部题目 -->
           <div 
             class="category-item"
-            :class="{ active: activeCategory === key && activeUnit === 'all' }"
-            @click="toggleCollapse(key)"
+            :class="{ active: activeCategory === 'all' }"
+            @click="switchCategory('all')"
           >
-            <span>{{ key }} ({{ subject.length }})</span>
-            <!-- 折叠/展开图标 -->
-            <span class="collapse-icon" :class="{ rotate: collapseStatus[key] }">▶</span>
+            <span>全部题目 ({{ questions.length }})</span>
           </div>
-          <!-- 单元二级分类（根据折叠状态显示/隐藏） -->
-          <div v-show="collapseStatus[key]" class="sub-category-wrap">
+          <!-- 科目一级分类（可折叠） -->
+          <div v-for="(subject, key) in subjectCategories" :key="key">
             <div 
-              v-for="unit in subject" 
-              :key="unit"
-              class="sub-category"
-              :class="{ active: activeCategory === key && activeUnit === unit }"
-              @click="switchCategory(key, unit)"
+              class="category-item"
+              :class="{ active: activeCategory === key && activeUnit === 'all' }"
+              @click="toggleCollapse(key)"
             >
-              {{ unit }}
+              <span>{{ key }} ({{ subject.length }})</span>
+              <!-- 折叠/展开图标 -->
+              <span class="collapse-icon" :class="{ rotate: collapseStatus[key] }">▶</span>
+            </div>
+            <!-- 单元二级分类（根据折叠状态显示/隐藏） -->
+            <div v-show="collapseStatus[key]" class="sub-category-wrap">
+              <div 
+                v-for="unit in subject" 
+                :key="unit"
+                class="sub-category"
+                :class="{ active: activeCategory === key && activeUnit === unit }"
+                @click="switchCategory(key, unit)"
+              >
+                {{ unit }}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 题目列表 -->
-      <div class="question-list">
-        <div class="question-list-title">
-          题目列表
-          <span class="question-list-count">共 {{ filterQuestions.length }} 题</span>
-        </div>
-        <div v-if="filterQuestions.length === 0" class="empty-state">
-          该分类暂无题目
-        </div>
-        <div 
-          v-else
-          v-for="(q, index) in filterQuestions" 
-          :key="q.name"
-          class="question-item"
-          :class="{
-            active: currentQuestion?.name === q.name,
-            collected: isQuestionCollected(q.name)
-          }"
-          @click="goToQuestion(index)"
-        >
-          <div>
-            <span>{{ q.mode }} 第{{ q.numb }}题</span>
-            <div class="question-item-info">{{ q.test.substring(0, 25) }}{{ q.test.length > 25 ? '...' : '' }}</div>
+        <!-- 题目列表 -->
+        <div class="question-list">
+          <div class="question-list-title">
+            题目列表
+            <span class="question-list-count">共 {{ filterQuestions.length }} 题</span>
           </div>
-          <span v-if="isQuestionFinished(q.name)" class="question-item-finished">已完成</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 核心答题区 -->
-    <div class="question-container" v-if="currentQuestion && !showCollectModal">
-      <!-- 题目元信息：科目、单元、题型 -->
-      <div class="question-meta">
-        <span>科目：{{ currentQuestion.cls }}</span>
-        <span>单元：{{ currentQuestion.unit }}</span>
-        <span>题型：{{ currentQuestion.mode }}</span>
-        <span>题号：{{ currentQuestion.numb }}/{{ currentQuestion.all_numb }}</span>
-      </div>
-      <!-- 题干 -->
-      <div class="question-title">
-        <span>{{ currentQuestion.test }}</span>
-        <button 
-          @click="toggleCollect" 
-          class="collect-btn"
-          :class="{ collected: isCollected }"
-        >
-          {{ isCollected ? '取消收藏' : '收藏题目' }}
-        </button>
-      </div>
-      <!-- 选项 -->
-      <div class="options-container">
-        <label 
-          v-for="(option, index) in currentQuestion.option" 
-          :key="index"
-          class="option-item"
-          :class="{
-            'selected': selectedOption === getOptionKey(option),
-            'correct': showResult && getOptionKey(option) === currentQuestion.answer,
-            'incorrect': showResult && selectedOption === getOptionKey(option) && selectedOption !== currentQuestion.answer
-          }"
-        >
-          <input
-            type="radio"
-            :value="getOptionKey(option)"
-            v-model="selectedOption"
-            :disabled="showResult" 
-            class="option-input"
-          />
-          <span class="option-label">{{ option }}</span>
-        </label>
-      </div>
-
-      <div class="controls">
-        <div v-if="!showResult">
-          <button @click="submitAnswer" class="submit-btn" :disabled="!selectedOption">提交答案</button>
-        </div>
-
-        <div v-if="showResult">
-          <!-- 答题结果 -->
-          <div class="result-message" :class="isCorrect ? 'result-correct' : 'result-incorrect'">
-            {{ isCorrect ? `回答正确！正确答案：${currentQuestion.answer}` : `回答错误！正确答案：${currentQuestion.answer}` }}
+          <div v-if="filterQuestions.length === 0" class="empty-state">
+            该分类暂无题目
           </div>
-          <!-- 解析与讨论 -->
-          <div class="analysis">
-            <div class="analysis-title">考点还原</div>
-            <div class="analysis-content" v-html="currentQuestion.point"></div>
-            <div class="discuss" v-if="currentQuestion.discuss">
-              <strong>题目讨论：</strong>{{ currentQuestion.discuss }}
+          <div 
+            v-else
+            v-for="(q, index) in filterQuestions" 
+            :key="q.name"
+            class="question-item"
+            :class="{
+              active: currentQuestion?.name === q.name,
+              collected: isQuestionCollected(q.name)
+            }"
+            @click="goToQuestion(index)"
+          >
+            <div>
+              <span>{{ q.mode }} 第{{ q.numb }}题</span>
+              <div class="question-item-info">{{ q.test.substring(0, 25) }}{{ q.test.length > 25 ? '...' : '' }}</div>
             </div>
+            <span v-if="isQuestionFinished(q.name)" class="question-item-finished">已完成</span>
           </div>
-          <!-- 下一题按钮 -->
-          <button @click="nextQuestion" class="next-btn" :disabled="currentQuestionIndex >= filterQuestions.length - 1">
-            {{ currentQuestionIndex >= filterQuestions.length - 1 ? '已是最后一题' : '下一题' }}
+        </div>
+      </div>
+
+      <!-- 核心答题区 -->
+      <div class="question-container" v-if="currentQuestion && !showCollectModal">
+        <!-- 题目元信息：科目、单元、题型 -->
+        <div class="question-meta">
+          <span>科目：{{ currentQuestion.cls }}</span>
+          <span>单元：{{ currentQuestion.unit }}</span>
+          <span>题型：{{ currentQuestion.mode }}</span>
+          <span>题号：{{ currentQuestion.numb }}/{{ currentQuestion.all_numb }}</span>
+        </div>
+        <!-- 题干 -->
+        <div class="question-title">
+          <span>{{ currentQuestion.test }}</span>
+          <button 
+            @click="toggleCollect" 
+            class="collect-btn"
+            :class="{ collected: isCollected }"
+          >
+            {{ isCollected ? '取消收藏' : '收藏题目' }}
           </button>
         </div>
-      </div>
-    </div>
-
-    <div v-else-if="!showCollectModal" class="empty-state">
-      <p>当前分类暂无题目或已完成所有题目！</p>
-      <button @click="resetProgress" class="reset-btn">重新开始</button>
-    </div>
-
-    <!-- 收藏列表弹窗 -->
-    <div class="modal" v-if="showCollectModal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>我的收藏题目 ({{ collectedQuestions.length }})</h2>
-          <button @click="closeCollectModal" class="close-btn">关闭</button>
-        </div>
-        
-        <div v-if="collectedQuestions.length > 0">
-          <div 
-            v-for="question in collectedQuestions" 
-            :key="question.name"
-            class="collect-item"
-            @click="goToCollectedQuestion(question)"
+        <!-- 选项 -->
+        <div class="options-container">
+          <label 
+            v-for="(option, index) in currentQuestion.option" 
+            :key="index"
+            class="option-item"
+            :class="{
+              'selected': selectedOption === getOptionKey(option),
+              'correct': showResult && getOptionKey(option) === currentQuestion.answer,
+              'incorrect': showResult && selectedOption === getOptionKey(option) && selectedOption !== currentQuestion.answer
+            }"
           >
-            <strong>{{ question.mode }}：</strong>{{ question.test }}
-            <div class="collect-item-meta">
-              {{ question.cls }} - {{ question.unit }} | 题号：{{ question.numb }}
+            <input
+              type="radio"
+              :value="getOptionKey(option)"
+              v-model="selectedOption"
+              :disabled="showResult" 
+              class="option-input"
+            />
+            <span class="option-label">{{ option }}</span>
+          </label>
+        </div>
+
+        <div class="controls">
+          <div v-if="!showResult">
+            <button @click="submitAnswer" class="submit-btn" :disabled="!selectedOption">提交答案</button>
+          </div>
+
+          <div v-if="showResult">
+            <!-- 答题结果 -->
+            <div class="result-message" :class="isCorrect ? 'result-correct' : 'result-incorrect'">
+              {{ isCorrect ? `回答正确！正确答案：${currentQuestion.answer}` : `回答错误！正确答案：${currentQuestion.answer}` }}
             </div>
+            <!-- 解析与讨论 -->
+            <div class="analysis">
+              <div class="analysis-title">考点还原</div>
+              <div class="analysis-content" v-html="currentQuestion.point"></div>
+              <div class="discuss" v-if="currentQuestion.discuss">
+                <strong>题目讨论：</strong>{{ currentQuestion.discuss }}
+              </div>
+            </div>
+            <!-- 下一题按钮 -->
+            <button @click="nextQuestion" class="next-btn" :disabled="currentQuestionIndex >= filterQuestions.length - 1">
+              {{ currentQuestionIndex >= filterQuestions.length - 1 ? '已是最后一题' : '下一题' }}
+            </button>
           </div>
         </div>
-        <div v-else class="empty-state">
-          暂无收藏的题目
-        </div>
-        
-        <button @click="closeCollectModal" class="back-btn">返回刷题</button>
       </div>
+
+      <div v-else-if="!showCollectModal" class="empty-state">
+        <p>当前分类暂无题目或已完成所有题目！</p>
+        <button @click="resetProgress" class="reset-btn">重新开始</button>
+      </div>
+
+      <!-- 收藏列表弹窗 -->
+      <div class="modal" v-if="showCollectModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>我的收藏题目 ({{ collectedQuestions.length }})</h2>
+            <button @click="closeCollectModal" class="close-btn">关闭</button>
+          </div>
+          
+          <div v-if="collectedQuestions.length > 0">
+            <div 
+              v-for="question in collectedQuestions" 
+              :key="question.name"
+              class="collect-item"
+              @click="goToCollectedQuestion(question)"
+            >
+              <strong>{{ question.mode }}：</strong>{{ question.test }}
+              <div class="collect-item-meta">
+                {{ question.cls }} - {{ question.unit }} | 题号：{{ question.numb }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            暂无收藏的题目
+          </div>
+          
+          <button @click="closeCollectModal" class="back-btn">返回刷题</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 未加载题库时的提示 -->
+    <div v-else class="empty-state">
+      <p>请先在上方配置GitHub仓库信息并点击"加载题库"按钮，加载题目后即可开始刷题！</p>
+      <p style="margin-top: 10px; font-size: 0.9em; color: #999;">
+        提示：1. 仓库中需存放符合格式的JSON题目文件；2. Token需有repo权限（私有仓库必填）；3. 文件名无特殊要求，后缀为.json即可
+      </p>
     </div>
   </div>
 
@@ -624,76 +790,28 @@
 
     createApp({
       setup() {
-        // ========== 题目数据：完全适配指定JSON格式 ==========
-        const questions = ref([
-          {
-            "name": "2025-10-25-13-22-25-122",
-            "cls": "医学心理学",
-            "numb": "4",
-            "all_numb": "19",
-            "unit": "一、医学心理学总论",
-            "mode": "A1型题",
-            "test": "医学心理学的研究任务不包括",
-            "option": [
-              "A.医学管理中存在的心理问题解决办法",
-              "B.疾病发生、发展过程中心理因素的作用规律",
-              "C.心理因素对身体生理、生物化学功能的影响",
-              "D.个性心理特征或行为模式在疾病的发生和康复中的意义",
-              "E.研究运用医学心理学的原理达到防病治病、养生保健的目的"
-            ],
-            "answer": "A",
-            "point": "（P2）“医学心理学的研究范围主要包括：（1）研究心理或行为的生物学和社会学基础及其在健康和疾病中的意义（D对）;（2）研究心身相互作用关系及其机制（C对）;（3）研究心理社会因素在疾病过程中的作用规律（B对）;（4）研究各种疾病过程中的心理和行为特征及变化规律;（5）研究医疗过程中医患关系的特征及增进医患关系的途径和方法;（6）研究如何将心理学原理及技术应用于人类的健康促进及疾病防治（E对）”。",
-            "discuss": "旧版书中，医学心理学的具体任务包括：心理社会因素在疾病发生、发展和变化过程中的作用规律（B对）：心理评估手段在疾病的诊断、治疗、护理与预防中的作用：运用心理治疗的方法达到治病、防病和养生保健的目的（E对）：患者心理活动的特点及心理护理方法的运用（D对）。心理因素对身体生理、生物化学功能的影响（C对），因此，A错，为本题正确答案。该题目是教材改版前题目，参考即可，不必深究。请同学们以考点还原中的课本原文为主。"
-          },
-          {
-            "name": "2025-10-25-13-25-48-567",
-            "cls": "医学心理学",
-            "numb": "5",
-            "all_numb": "19",
-            "unit": "一、医学心理学总论",
-            "mode": "A1型题",
-            "test": "医学心理学的研究对象是",
-            "option": [
-              "A.心理活动的规律",
-              "B.行为活动的规律",
-              "C.疾病的发生发展规律",
-              "D.影响健康的心理因素和行为",
-              "E.疾病的预防和治疗规律"
-            ],
-            "answer": "D",
-            "point": "（P1）医学心理学是研究**心理因素、行为因素**与健康和疾病之间相互关系的科学，其研究对象是**影响健康的心理因素和行为**（D对），以及心理因素与生理、病理因素的相互作用。",
-            "discuss": "心理活动的规律（A错）、行为活动的规律（B错）是普通心理学的研究对象；疾病的发生发展规律（C错）、疾病的预防和治疗规律（E错）是临床医学的研究范畴。医学心理学是交叉学科，核心是心身相互作用。"
-          },
-          {
-            "name": "2025-10-26-09-10-20-333",
-            "cls": "生理学",
-            "numb": "2",
-            "all_numb": "25",
-            "unit": "一、细胞的基本功能",
-            "mode": "A1型题",
-            "test": "细胞膜的物质转运中，属于主动转运的是",
-            "option": [
-              "A.氧气的跨膜扩散",
-              "B.葡萄糖进入红细胞",
-              "C.钠离子的跨膜转运",
-              "D.水的跨膜渗透",
-              "E.二氧化碳的跨膜扩散"
-            ],
-            "answer": "C",
-            "point": "（P15）主动转运是指细胞通过本身的耗能过程，将物质由膜的低浓度一侧向高浓度一侧转运的过程，包括原发性主动转运和继发性主动转运。钠离子的跨膜转运（C对）属于原发性主动转运，由钠钾泵介导，消耗ATP。",
-            "discuss": "氧气（A错）、二氧化碳（E错）的跨膜扩散属于单纯扩散；葡萄糖进入红细胞（B错）属于易化扩散；水的跨膜渗透（D错）属于单纯扩散，均为被动转运，不消耗能量。"
-          }
-        ]);
+        // ========== GitHub配置相关响应式数据（新增核心） ==========
+        const githubRepo = ref(''); // GitHub仓库地址：owner/repo
+        const githubToken = ref(''); // GitHub Token
+        const githubPath = ref(''); // 仓库中题目文件路径
+        const loading = ref(false); // 加载状态
+        const errorMsg = ref(''); // 错误信息
+        const successMsg = ref(''); // 成功信息
+        const questionsLoaded = ref(false); // 题库是否加载完成
 
-        // ========== 本地存储配置 ==========
+        // ========== 题目数据（初始为空，从GitHub加载） ==========
+        const questions = ref([]);
+
+        // ========== 本地存储配置（新增GitHub配置存储） ==========
         const STORAGE_KEY = {
           progress: 'medical_question_progress', // 做题进度（分类+当前题索引）
           collected: 'medical_collected_questions', // 收藏题目
           finished: 'medical_finished_questions', // 完成答题的题目name
-          collapse: 'medical_category_collapse' // 分类折叠状态（新增）
+          collapse: 'medical_category_collapse', // 分类折叠状态
+          githubConfig: 'medical_github_config' // GitHub配置信息
         };
 
-        // ========== 响应式数据（新增：折叠状态管理） ==========
+        // ========== 刷题相关响应式数据 ==========
         const activeCategory = ref('all'); // 当前选中科目：all=全部，其他=科目名
         const activeUnit = ref('all');     // 当前选中单元：all=该科目全部，其他=单元名
         const currentQuestionIndex = ref(0); // 当前题在筛选列表中的索引
@@ -703,9 +821,159 @@
         const collectedQuestions = ref([]); // 收藏题目列表
         const finishedQuestionNames = ref([]); // 已完成的题目name数组
         const showCollectModal = ref(false); // 收藏弹窗显示状态
-        const collapseStatus = ref({});   // 分类折叠状态：{科目名: 布尔值}，true=展开，false=折叠
+        const collapseStatus = ref({});   // 分类折叠状态：{科目名: 布尔值}
 
-        // ========== 自动生成二级分类：科目+单元 ==========
+        // ========== 加载本地存储（新增GitHub配置加载） ==========
+        const loadStorage = () => {
+          // 加载GitHub配置
+          const savedConfig = localStorage.getItem(STORAGE_KEY.githubConfig);
+          if (savedConfig) {
+            const { repo, token, path } = JSON.parse(savedConfig);
+            githubRepo.value = repo;
+            githubToken.value = token;
+            githubPath.value = path;
+          }
+
+          // 加载刷题进度
+          const savedProgress = localStorage.getItem(STORAGE_KEY.progress);
+          if (savedProgress) {
+            const { category, unit, index } = JSON.parse(savedProgress);
+            activeCategory.value = category;
+            activeUnit.value = unit;
+            currentQuestionIndex.value = index;
+          }
+
+          // 加载收藏
+          const savedCollected = localStorage.getItem(STORAGE_KEY.collected);
+          if (savedCollected) collectedQuestions.value = JSON.parse(savedCollected);
+
+          // 加载完成记录
+          const savedFinished = localStorage.getItem(STORAGE_KEY.finished);
+          if (savedFinished) finishedQuestionNames.value = JSON.parse(savedFinished);
+
+          // 加载折叠状态
+          const savedCollapse = localStorage.getItem(STORAGE_KEY.collapse);
+          if (savedCollapse) collapseStatus.value = JSON.parse(savedCollapse);
+        };
+
+        // ========== 保存GitHub配置（新增） ==========
+        const saveGitHubConfig = () => {
+          localStorage.setItem(STORAGE_KEY.githubConfig, JSON.stringify({
+            repo: githubRepo.value,
+            token: githubToken.value,
+            path: githubPath.value
+          }));
+        };
+
+        // ========== 从GitHub加载题目核心方法（新增） ==========
+        const loadQuestionsFromGitHub = async () => {
+          // 重置状态
+          loading.value = true;
+          errorMsg.value = '';
+          successMsg.value = '';
+          questions.value = [];
+          questionsLoaded.value = false;
+
+          try {
+            // 1. 验证仓库地址格式
+            if (!githubRepo.value || !githubRepo.value.includes('/')) {
+              throw new Error('仓库地址格式错误，请输入：owner/repo（如：octocat/medical-questions）');
+            }
+
+            // 2. 拆分仓库信息
+            const [owner, repo] = githubRepo.value.split('/');
+            const path = githubPath.value.trim() || '';
+            
+            // 3. 构建API请求参数
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+            const headers = {};
+            if (githubToken.value) {
+              headers['Authorization'] = `token ${githubToken.value}`;
+            }
+            headers['Accept'] = 'application/vnd.github.v3+json';
+
+            // 4. 请求仓库文件列表
+            const response = await fetch(apiUrl, { headers });
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(`GitHub API请求失败：${errorData.message || `HTTP ${response.status}`}`);
+            }
+
+            const files = await response.json();
+            
+            // 5. 筛选JSON文件
+            const jsonFiles = files.filter(file => 
+              file.type === 'file' && file.name.endsWith('.json')
+            );
+
+            if (jsonFiles.length === 0) {
+              throw new Error(`在仓库 ${githubRepo.value} 的 ${path || '根'} 目录下未找到JSON格式的题目文件`);
+            }
+
+            // 6. 批量加载JSON题目文件
+            const questionPromises = jsonFiles.map(async (file) => {
+              const fileResponse = await fetch(file.download_url, { headers });
+              if (!fileResponse.ok) {
+                console.warn(`加载文件 ${file.name} 失败，跳过该文件`);
+                return null;
+              }
+              try {
+                const questionData = await fileResponse.json();
+                // 验证题目格式（核心字段检查）
+                const requiredFields = ['name', 'cls', 'numb', 'all_numb', 'unit', 'mode', 'test', 'option', 'answer', 'point'];
+                const missingFields = requiredFields.filter(field => !questionData[field]);
+                if (missingFields.length > 0) {
+                  console.warn(`文件 ${file.name} 缺少必填字段：${missingFields.join(', ')}，跳过该文件`);
+                  return null;
+                }
+                return questionData;
+              } catch (e) {
+                console.warn(`文件 ${file.name} JSON解析失败：${e.message}，跳过该文件`);
+                return null;
+              }
+            });
+
+            // 7. 处理加载结果
+            const loadedQuestions = (await Promise.all(questionPromises)).filter(Boolean);
+            if (loadedQuestions.length === 0) {
+              throw new Error('未加载到任何有效格式的题目文件，请检查文件内容是否符合要求');
+            }
+
+            // 8. 更新题目数据
+            questions.value = loadedQuestions;
+            questionsLoaded.value = true;
+            
+            // 9. 初始化折叠状态
+            Object.keys(subjectCategories.value).forEach(key => {
+              collapseStatus.value[key] = true;
+            });
+
+            // 10. 保存配置和状态
+            saveGitHubConfig();
+            saveCollapseStatus();
+            
+            successMsg.value = `成功加载 ${loadedQuestions.length} 道题目（共找到 ${jsonFiles.length} 个JSON文件，${jsonFiles.length - loadedQuestions.length} 个文件格式无效）`;
+
+          } catch (error) {
+            errorMsg.value = error.message;
+            console.error('加载GitHub题库失败：', error);
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        // ========== 辅助方法 ==========
+        // 重置GitHub配置
+        const resetConfig = () => {
+          githubRepo.value = '';
+          githubToken.value = '';
+          githubPath.value = '';
+          localStorage.removeItem(STORAGE_KEY.githubConfig);
+          errorMsg.value = '';
+          successMsg.value = '';
+        };
+
+        // 自动生成二级分类：科目+单元
         const subjectCategories = computed(() => {
           const categories = {};
           questions.value.forEach(q => {
@@ -714,17 +982,14 @@
             }
             categories[q.cls].add(q.unit);
           });
-          // 转换为数组，并初始化折叠状态（首次加载默认展开）
+          // 转换为数组
           Object.keys(categories).forEach(key => {
             categories[key] = Array.from(categories[key]);
-            if (collapseStatus.value[key] === undefined) {
-              collapseStatus.value[key] = true;
-            }
           });
           return categories;
         });
 
-        // ========== 筛选当前分类的题目 ==========
+        // 筛选当前分类的题目
         const filterQuestions = computed(() => {
           return questions.value.filter(q => {
             // 科目筛选
@@ -735,7 +1000,7 @@
           });
         });
 
-        // ========== 当前答题的题目 ==========
+        // 当前答题的题目
         const currentQuestion = computed(() => {
           if (filterQuestions.value.length > 0 && currentQuestionIndex.value < filterQuestions.value.length) {
             return filterQuestions.value[currentQuestionIndex.value];
@@ -743,41 +1008,20 @@
           return null;
         });
 
-        // ========== 当前分类名称（用于进度显示） ==========
+        // 当前分类名称
         const activeCategoryName = computed(() => {
           if (activeCategory.value === 'all') return '全部题目';
           if (activeUnit.value === 'all') return activeCategory.value;
           return `${activeCategory.value}-${activeUnit.value}`;
         });
 
-        // ========== 当前题目是否已收藏 ==========
+        // 当前题目是否已收藏
         const isCollected = computed(() => {
           if (!currentQuestion.value) return false;
           return collectedQuestions.value.some(item => item.name === currentQuestion.value.name);
         });
 
-        // ========== 本地存储方法（新增：折叠状态的保存/加载） ==========
-        // 加载本地存储数据
-        const loadStorage = () => {
-          // 加载进度
-          const savedProgress = localStorage.getItem(STORAGE_KEY.progress);
-          if (savedProgress) {
-            const { category, unit, index } = JSON.parse(savedProgress);
-            activeCategory.value = category;
-            activeUnit.value = unit;
-            currentQuestionIndex.value = index;
-          }
-          // 加载收藏
-          const savedCollected = localStorage.getItem(STORAGE_KEY.collected);
-          if (savedCollected) collectedQuestions.value = JSON.parse(savedCollected);
-          // 加载完成记录
-          const savedFinished = localStorage.getItem(STORAGE_KEY.finished);
-          if (savedFinished) finishedQuestionNames.value = JSON.parse(savedFinished);
-          // 加载折叠状态（新增）
-          const savedCollapse = localStorage.getItem(STORAGE_KEY.collapse);
-          if (savedCollapse) collapseStatus.value = JSON.parse(savedCollapse);
-        };
-
+        // ========== 本地存储方法 ==========
         // 保存做题进度
         const saveProgress = () => {
           localStorage.setItem(STORAGE_KEY.progress, JSON.stringify({
@@ -797,12 +1041,12 @@
           localStorage.setItem(STORAGE_KEY.finished, JSON.stringify(finishedQuestionNames.value));
         };
 
-        // 保存折叠状态（新增）
+        // 保存折叠状态
         const saveCollapseStatus = () => {
           localStorage.setItem(STORAGE_KEY.collapse, JSON.stringify(collapseStatus.value));
         };
 
-        // ========== 核心业务方法（新增：折叠/展开切换） ==========
+        // ========== 核心业务方法 ==========
         // 提取选项的前缀（A/B/C/D/E）
         const getOptionKey = (option) => {
           return option.charAt(0);
@@ -818,15 +1062,12 @@
           return collectedQuestions.value.some(item => item.name === name);
         };
 
-        // 折叠/展开分类（新增核心方法）
+        // 折叠/展开分类
         const toggleCollapse = (key) => {
-          // 切换折叠状态
           collapseStatus.value[key] = !collapseStatus.value[key];
-          // 若当前选中的是该科目下的单元，折叠时不切换分类；展开时保持选中
           if (collapseStatus.value[key] === false && activeCategory.value === key && activeUnit.value !== 'all') {
             switchCategory(key, 'all');
           }
-          // 保存折叠状态到本地
           saveCollapseStatus();
         };
 
@@ -834,10 +1075,9 @@
         const switchCategory = (category, unit = 'all') => {
           activeCategory.value = category;
           activeUnit.value = unit;
-          currentQuestionIndex.value = 0; // 切换分类回到第一题
+          currentQuestionIndex.value = 0;
           saveProgress();
           resetAnswerState();
-          // 切换到某科目/单元时，自动展开该科目（新增）
           if (category !== 'all') {
             collapseStatus.value[category] = true;
             saveCollapseStatus();
@@ -851,7 +1091,7 @@
           resetAnswerState();
         };
 
-        // 重置答题状态（选中项、结果、是否正确）
+        // 重置答题状态
         const resetAnswerState = () => {
           selectedOption.value = null;
           showResult.value = false;
@@ -861,10 +1101,8 @@
         // 提交答案
         const submitAnswer = () => {
           if (!selectedOption.value || !currentQuestion.value) return;
-          // 校验答案：直接匹配answer字段
           isCorrect.value = selectedOption.value === currentQuestion.value.answer;
           showResult.value = true;
-          // 记录完成的题目（去重）
           if (!finishedQuestionNames.value.includes(currentQuestion.value.name)) {
             finishedQuestionNames.value.push(currentQuestion.value.name);
             saveFinished();
@@ -884,9 +1122,9 @@
           if (!currentQuestion.value) return;
           const index = collectedQuestions.value.findIndex(item => item.name === currentQuestion.value.name);
           if (index > -1) {
-            collectedQuestions.value.splice(index, 1); // 取消收藏
+            collectedQuestions.value.splice(index, 1);
           } else {
-            collectedQuestions.value.push({ ...currentQuestion.value }); // 添加收藏
+            collectedQuestions.value.push({ ...currentQuestion.value });
           }
           saveCollected();
         };
@@ -909,11 +1147,9 @@
         const closeCollectModal = () => {
           showCollectModal.value = false;
         };
-        // 从收藏列表跳转到对应题目
         const goToCollectedQuestion = (question) => {
           activeCategory.value = question.cls;
           activeUnit.value = question.unit;
-          // 找到该题目在对应分类中的索引
           const index = filterQuestions.value.findIndex(q => q.name === question.name);
           if (index > -1) currentQuestionIndex.value = index;
           saveProgress();
@@ -926,14 +1162,28 @@
         watch([activeCategory, activeUnit, currentQuestionIndex], () => {
           saveProgress();
         });
-        // 监听折叠状态变化，自动保存（新增）
+
+        // 监听折叠状态变化，自动保存
         watch(collapseStatus, () => {
           saveCollapseStatus();
         }, { deep: true });
+
         // 初始化加载本地存储数据
         loadStorage();
 
         return {
+          // GitHub配置相关
+          githubRepo,
+          githubToken,
+          githubPath,
+          loading,
+          errorMsg,
+          successMsg,
+          questionsLoaded,
+          loadQuestionsFromGitHub,
+          resetConfig,
+          
+          // 刷题相关
           questions,
           subjectCategories,
           filterQuestions,
@@ -949,6 +1199,7 @@
           showCollectModal,
           isCollected,
           collapseStatus,
+          
           // 方法
           getOptionKey,
           isQuestionFinished,
