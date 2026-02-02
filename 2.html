@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>医学刷题 - 轻量版</title>
-  <!-- 引入 jQuery -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
 <body>
@@ -57,7 +56,7 @@ $(function() {
     finished: 'jq_finished'
   };
 
-  let fileList = [];       // 存储 {name, url} 的文件列表
+  let fileList = [];       // 存储 {name, path, apiUrl} 的文件列表
   let questionsCache = {}; // 缓存已加载的题目 {filename => questionObj}
   let currentFile = null;
   let collected = JSON.parse(localStorage.getItem(STORAGE.collected) || '[]');
@@ -85,7 +84,10 @@ $(function() {
 
   function getHeaders() {
     const token = $('#token').val();
-    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    const headers = { 
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    };
     if (token) headers['Authorization'] = `token ${token}`;
     return headers;
   }
@@ -110,14 +112,17 @@ $(function() {
       const items = await res.json();
       fileList = items
         .filter(item => item.type === 'file' && item.name.endsWith('.json'))
-        .map(item => ({ name: item.name, url: item.download_url }));
+        .map(item => ({ 
+          name: item.name, 
+          path: item.path,
+          apiUrl: item.url
+        }));
 
       if (fileList.length === 0) {
         showMessage('未找到 .json 题目文件', true);
         return;
       }
 
-      // 渲染题目列表（仅文件名）
       renderQuestionList();
       $('#main').show();
       saveConfig();
@@ -128,7 +133,7 @@ $(function() {
     }
   });
 
-  // ====== 渲染题目列表（仅文件名 + 序号） ======
+  // ====== 渲染题目列表 ======
   function renderQuestionList() {
     let html = '';
     fileList.forEach((file, idx) => {
@@ -150,7 +155,7 @@ $(function() {
     });
   }
 
-  // ====== 按需加载并显示题目 ======
+  // ====== 核心修复：加载题目（解决Base64换行+中文乱码） ======
   async function loadAndShowQuestion(idx) {
     const file = fileList[idx];
     currentFile = file;
@@ -162,13 +167,27 @@ $(function() {
     }
 
     try {
-      const res = await fetch(file.url, { headers: getHeaders() });
-      if (!res.ok) throw new Error('文件下载失败');
-      const question = await res.json();
+      const res = await fetch(file.apiUrl, { headers: getHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      
+      const fileData = await res.json();
+      // 修复1：清理Base64中的所有换行/空格，atob不支持含换行的Base64
+      const cleanBase64 = fileData.content.replace(/\s+/g, '');
+      // 修复2：先Base64解码为二进制，再通过UTF-8解析为字符串（解决中文乱码）
+      const binaryStr = atob(cleanBase64);
+      const uint8Array = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        uint8Array[i] = binaryStr.charCodeAt(i);
+      }
+      // 用UTF-8解码二进制数据，完美支持中文
+      const jsonStr = new TextDecoder('utf-8').decode(uint8Array);
+      const question = JSON.parse(jsonStr);
+      
       questionsCache[file.name] = question;
       showQuestion(question);
     } catch (err) {
       $('#question-content').html(`<p style="color:red;">加载题目失败：${err.message}</p>`);
+      console.error('加载题目详情失败：', err);
     }
   }
 
@@ -176,7 +195,7 @@ $(function() {
   function showQuestion(q) {
     let optionsHtml = '';
     q.option.forEach(opt => {
-      const key = opt.charAt(0); // A, B, C...
+      const key = opt.charAt(0);
       optionsHtml += `<label><input type="radio" name="answer" value="${key}"> ${opt}</label><br>`;
     });
 
@@ -210,7 +229,7 @@ $(function() {
       collected.push({ filename: currentFile.name, ...q });
     }
     localStorage.setItem(STORAGE.collected, JSON.stringify(collected));
-    renderQuestionList(); // 刷新列表图标
+    renderQuestionList();
     $('#collect-btn').text(isCollected(q) ? '取消收藏' : '收藏');
   }
 
@@ -229,14 +248,12 @@ $(function() {
     `);
     $('#analysis').show();
 
-    // 标记为已完成
     if (!finished.includes(currentFile.name)) {
       finished.push(currentFile.name);
       localStorage.setItem(STORAGE.finished, JSON.stringify(finished));
       renderQuestionList();
     }
 
-    // 显示“下一题”按钮
     if (fileList.indexOf(currentFile) < fileList.length - 1) {
       $('#question-content').append('<br><button id="next-btn">下一题</button>');
       $('#next-btn').on('click', () => {
@@ -264,7 +281,6 @@ $(function() {
     $('.collect-item').on('click', function() {
       const i = $(this).data('i');
       const item = collected[i];
-      // 找到对应文件
       const file = fileList.find(f => f.name === item.filename);
       if (file) {
         const idx = fileList.indexOf(file);
