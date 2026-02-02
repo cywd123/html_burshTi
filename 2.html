@@ -36,6 +36,7 @@
 
   <div id="current-question" style="margin-top:20px; padding:10px; border:1px solid #ccc;">
     <div id="question-content">请选择一道题目开始答题</div>
+    <div id="preload-status" style="margin-top:10px; font-size:12px; color:#666;"></div>
   </div>
 </div>
 
@@ -53,14 +54,45 @@ $(function() {
     config: 'jq_github_config',
     progress: 'jq_progress',
     collected: 'jq_collected',
-    finished: 'jq_finished'
+    finished: 'jq_finished',
+    questionsCache: 'jq_questions_cache' // 新增：存储题目缓存的key
   };
 
   let fileList = [];       // 存储 {name, path, apiUrl} 的文件列表
-  let questionsCache = {}; // 缓存已加载的题目 {filename => questionObj}
+  let questionsCache = {}; // 内存缓存，优先读取
   let currentFile = null;
   let collected = JSON.parse(localStorage.getItem(STORAGE.collected) || '[]');
   let finished = JSON.parse(localStorage.getItem(STORAGE.finished) || '[]');
+  let preloadPromise = null; // 预加载Promise，防止重复预加载
+
+  // ====== 初始化缓存：从本地存储加载 ======
+  function initQuestionsCache() {
+    const cached = localStorage.getItem(STORAGE.questionsCache);
+    if (cached) {
+      try {
+        questionsCache = JSON.parse(cached);
+      } catch (e) {
+        console.error('加载本地缓存失败，将清空缓存', e);
+        questionsCache = {};
+        localStorage.removeItem(STORAGE.questionsCache);
+      }
+    }
+  }
+
+  // ====== 保存缓存到本地存储 ======
+  function saveQuestionsCache() {
+    try {
+      localStorage.setItem(STORAGE.questionsCache, JSON.stringify(questionsCache));
+    } catch (e) {
+      console.error('保存缓存到本地存储失败', e);
+      // 本地存储满了的话，清空最旧的缓存（简单处理）
+      const keys = Object.keys(questionsCache);
+      if (keys.length > 0) {
+        delete questionsCache[keys[0]];
+        saveQuestionsCache();
+      }
+    }
+  }
 
   // ====== 工具函数 ======
   function saveConfig() {
@@ -123,6 +155,9 @@ $(function() {
         return;
       }
 
+      // 初始化缓存
+      initQuestionsCache();
+      
       renderQuestionList();
       $('#main').show();
       saveConfig();
@@ -139,11 +174,13 @@ $(function() {
     fileList.forEach((file, idx) => {
       const isCollected = collected.some(c => c.filename === file.name);
       const isFinished = finished.includes(file.name);
+      const isCached = !!questionsCache[file.name]; // 标记是否已缓存
       html += `
         <div class="q-item" data-idx="${idx}" style="padding:5px; cursor:pointer; border-bottom:1px solid #eee;">
           ${idx + 1}. ${file.name}
           ${isCollected ? ' ⭐' : ''}
           ${isFinished ? ' ✅' : ''}
+          ${isCached ? ' 📥' : ''} <!-- 缓存标记 -->
         </div>
       `;
     });
@@ -155,15 +192,11 @@ $(function() {
     });
   }
 
-  // ====== 核心修复：加载题目（解决Base64换行+中文乱码） ======
-  async function loadAndShowQuestion(idx) {
-    const file = fileList[idx];
-    currentFile = file;
-
-    // 先检查缓存
+  // ====== 加载单个题目（支持本地缓存） ======
+  async function loadSingleQuestion(file) {
+    // 内存缓存优先
     if (questionsCache[file.name]) {
-      showQuestion(questionsCache[file.name]);
-      return;
+      return questionsCache[file.name];
     }
 
     try {
@@ -171,20 +204,77 @@ $(function() {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       
       const fileData = await res.json();
-      // 修复1：清理Base64中的所有换行/空格，atob不支持含换行的Base64
+      // 清理Base64中的所有换行/空格，解决中文乱码
       const cleanBase64 = fileData.content.replace(/\s+/g, '');
-      // 修复2：先Base64解码为二进制，再通过UTF-8解析为字符串（解决中文乱码）
       const binaryStr = atob(cleanBase64);
       const uint8Array = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
         uint8Array[i] = binaryStr.charCodeAt(i);
       }
-      // 用UTF-8解码二进制数据，完美支持中文
       const jsonStr = new TextDecoder('utf-8').decode(uint8Array);
       const question = JSON.parse(jsonStr);
       
+      // 存入内存缓存并保存到本地存储
       questionsCache[file.name] = question;
+      saveQuestionsCache();
+      
+      return question;
+    } catch (err) {
+      console.error(`加载题目 ${file.name} 失败：`, err);
+      throw err;
+    }
+  }
+
+  // ====== 预加载前后4题 ======
+  async function preloadSurroundingQuestions(currentIdx) {
+    if (preloadPromise) return preloadPromise; // 防止重复预加载
+    if (fileList.length === 0) return;
+
+    // 计算预加载范围：前后4题，边界处理
+    const startIdx = Math.max(0, currentIdx - 4);
+    const endIdx = Math.min(fileList.length - 1, currentIdx + 4);
+    const preloadFiles = fileList.slice(startIdx, endIdx + 1)
+      .filter(file => !questionsCache[file.name]); // 只加载未缓存的
+
+    if (preloadFiles.length === 0) {
+      $('#preload-status').text('✅ 前后题目已全部缓存');
+      preloadPromise = null;
+      return;
+    }
+
+    // 显示预加载状态
+    $('#preload-status').text(`🔄 预加载中：${preloadFiles.length} 道题目`);
+    
+    preloadPromise = Promise.all(
+      preloadFiles.map(file => loadSingleQuestion(file).catch(err => console.error(`预加载 ${file.name} 失败：`, err)))
+    );
+
+    try {
+      await preloadPromise;
+      $('#preload-status').text(`✅ 预加载完成：已缓存 ${Object.keys(questionsCache).length}/${fileList.length} 道题目`);
+      renderQuestionList(); // 更新缓存标记
+    } catch (err) {
+      $('#preload-status').text(`⚠️ 部分题目预加载失败`);
+    } finally {
+      preloadPromise = null; // 重置Promise
+    }
+  }
+
+  // ====== 加载并显示题目（核心函数） ======
+  async function loadAndShowQuestion(idx) {
+    const file = fileList[idx];
+    currentFile = file;
+
+    $('#question-content').html('<p>加载中...</p>');
+    $('#preload-status').text('');
+
+    try {
+      // 加载当前题目
+      const question = await loadSingleQuestion(file);
       showQuestion(question);
+      
+      // 异步预加载前后4题（不阻塞当前题目显示）
+      setTimeout(() => preloadSurroundingQuestions(idx), 500);
     } catch (err) {
       $('#question-content').html(`<p style="color:red;">加载题目失败：${err.message}</p>`);
       console.error('加载题目详情失败：', err);
@@ -294,18 +384,22 @@ $(function() {
 
   // ====== 重置 ======
   $('#reset-all').on('click', function() {
-    if (confirm('确定重置所有进度和收藏？')) {
+    if (confirm('确定重置所有进度、收藏和缓存？')) {
       localStorage.removeItem(STORAGE.finished);
       localStorage.removeItem(STORAGE.collected);
+      localStorage.removeItem(STORAGE.questionsCache); // 清空题目缓存
       finished = [];
       collected = [];
+      questionsCache = {}; // 清空内存缓存
       renderQuestionList();
       $('#question-content').text('请选择一道题目开始答题');
+      $('#preload-status').text('');
     }
   });
 
   // ====== 初始化 ======
   loadConfig();
+  initQuestionsCache(); // 初始化题目缓存
 });
 </script>
 
