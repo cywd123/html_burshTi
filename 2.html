@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>医学刷题 - 极简版</title>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <style>
+    /* 仅添加必要的排除样式，保持极简 */
+    .option-excluded {
+      color: #999;
+      text-decoration: line-through;
+      cursor: not-allowed;
+    }
+    .option-excluded input {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+  </style>
 </head>
 <body>
 
@@ -57,6 +69,8 @@ $(function() {
   let currentFile = null;
   let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
   let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
+  // 新增：存储当前题目被排除的选项
+  let excludedOptions = [];
 
   // 初始化：加载配置
   const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
@@ -133,6 +147,8 @@ $(function() {
   const loadQuestion = async (idx) => {
     currentFile = fileList[idx];
     $('#question-content').text('加载中...');
+    // 新增：加载新题目时清空排除的选项
+    excludedOptions = [];
 
     try {
       // 优先使用缓存
@@ -165,15 +181,20 @@ $(function() {
   // 显示题目内容
   const showQuestion = (q) => {
     let options = '';
-    q.option.forEach(opt => {
+    q.option.forEach((opt, optIdx) => {
       const key = opt.charAt(0);
-      options += `<label><input type="radio" name="answer" value="${key}"> ${opt}</label><br>`;
+      // 新增：判断当前选项是否被排除，添加对应的样式类
+      const isExcluded = excludedOptions.includes(optIdx);
+      const optionClass = isExcluded ? 'option-excluded' : '';
+      options += `<label class="option-item ${optionClass}" data-opt-idx="${optIdx}">
+        <input type="radio" name="answer" value="${key}"> ${opt}
+      </label><br>`;
     });
 
     const isCollected = collected.some(c => c.filename === currentFile.name);
     $('#question-content').html(`
       <h3>${q.test}</h3>
-      <div>${options}</div>
+      <div id="options-container">${options}</div>
       <button id="submit">提交答案</button>
       <button id="collect">${isCollected ? '取消收藏' : '收藏'}</button>
       <div id="result"></div>
@@ -183,7 +204,25 @@ $(function() {
       </div>
     `);
 
-    // 绑定事件
+    // 新增：绑定选项右键排除功能
+    $('.option-item').contextmenu(function(e) {
+      e.preventDefault(); // 阻止默认右键菜单
+      const optIdx = parseInt($(this).data('opt-idx'));
+      const $this = $(this);
+      
+      // 切换排除状态
+      if (excludedOptions.includes(optIdx)) {
+        // 恢复选项
+        excludedOptions = excludedOptions.filter(idx => idx !== optIdx);
+        $this.removeClass('option-excluded');
+      } else {
+        // 排除选项
+        excludedOptions.push(optIdx);
+        $this.addClass('option-excluded');
+      }
+    });
+
+    // 绑定原有事件
     $('#submit').click(() => checkAnswer(q));
     $('#collect').click(() => toggleCollect(q));
   };
@@ -253,6 +292,7 @@ $(function() {
       collected = [];
       finished = [];
       questionCache = {};
+      excludedOptions = []; // 清空排除选项
       renderList();
       $('#question-content').text('请选择一道题目开始答题');
     }
