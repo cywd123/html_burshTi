@@ -3,341 +3,321 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>医学刷题 - 极简版</title>
+  <title>医学刷题 - 完整版</title>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <style>
-    /* 仅添加必要的排除样式，保持极简 */
-    .option-excluded {
-      color: #999;
-      text-decoration: line-through;
-      cursor: not-allowed;
-    }
-    .option-excluded input {
-      pointer-events: none;
-      opacity: 0.5;
-    }
+    /* 仅保留必要样式，极简风格 */
+    .option-excluded { color: #999; text-decoration: line-through; cursor: not-allowed; }
+    .option-excluded input { pointer-events: none; opacity: 0.5; }
+    .card-item { display: inline-block; padding: 6px 10px; margin: 5px; border: 1px solid #ccc; cursor: pointer; }
+    .card-answered { background: #d4edda; border-color: #28a745; }
+    .card-wrong { background: #f8d7da; border-color: #dc3545; }
+    .mode-btn { margin: 0 5px; padding: 4px 10px; cursor: pointer; }
+    .mode-active { background: #007bff; color: #fff; border: 1px solid #007bff; }
+    #answer-card { margin: 15px 0; padding: 10px; border: 1px solid #eee; }
   </style>
 </head>
 <body>
-
-<!-- GitHub 配置区 -->
-<div id="github-config">
-  <h3>GitHub 题库配置</h3>
-  <p>仓库（如：user/repo）：<input type="text" id="repo" placeholder="owner/repo" /></p>
-  <p>Token（私有仓库需要）：<input type="password" id="token" /></p>
-  <p>路径（可选）：<input type="text" id="path" placeholder="questions/" /></p>
-  <button id="load-list">加载题目列表</button>
-  <div id="msg"></div>
-</div>
-
-<!-- 主界面（题库加载后显示） -->
-<div id="main" style="display:none;">
-  <h2>医学在线刷题</h2>
-  <button id="show-collect">我的收藏</button>
-  <button id="reset-all">重置进度</button>
-
-  <div id="question-list">
-    <h4>题目列表</h4>
-    <div id="list-items"></div>
+  <!-- GitHub 配置区 -->
+  <div id="github-config">
+    <h3>GitHub 题库配置</h3>
+    <p>仓库（如：user/repo）：<input type="text" id="repo" placeholder="owner/repo" /></p>
+    <p>Token（私有仓库需要）：<input type="password" id="token" /></p>
+    <p>路径（可选）：<input type="text" id="path" placeholder="questions/" /></p>
+    <button id="load-list">加载题目列表</button>
+    <div id="msg"></div>
   </div>
 
-  <div id="current-question">
-    <div id="question-content">请选择一道题目开始答题</div>
-  </div>
-</div>
+  <!-- 主界面（题库加载后显示） -->
+  <div id="main" style="display:none;">
+    <h2>医学在线刷题</h2>
+    <!-- 功能按钮区 -->
+    <div>
+      <button id="show-collect">我的收藏</button>
+      <button id="reset-all">重置进度</button>
+      <button id="export-wrong">导出错题本</button>
+      <!-- 模式切换按钮 -->
+      <span>刷题模式：</span>
+      <button class="mode-btn mode-active" data-mode="recite">背题模式</button>
+      <button class="mode-btn" data-mode="exam">考试模式</button>
+    </div>
 
-<!-- 收藏弹窗 -->
-<div id="collect-modal" style="display:none;">
-  <h3>我的收藏</h3>
-  <div id="collect-items"></div>
-  <button id="close-collect">关闭</button>
-</div>
+    <!-- 答题卡区域 -->
+    <div id="answer-card">
+      <h4>答题卡</h4>
+      <div id="card-list">未答题</div>
+    </div>
 
-<script>
-$(function() {
-  // 存储键名
-  const STORAGE_KEYS = {
-    config: 'jq_github_config',
-    collected: 'jq_collected',
-    finished: 'jq_finished',
-    cache: 'jq_questions_cache'
-  };
-
-  // 全局变量
-  let fileList = [];       
-  let questionCache = JSON.parse(localStorage.getItem(STORAGE_KEYS.cache) || '{}');
-  let currentFile = null;
-  let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
-  let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
-  let excludedOptions = [];
-  // 新增：存储当前加载的仓库和路径信息
-  let currentRepoInfo = {
-    repo: '',
-    path: ''
-  };
-
-  // 初始化：加载配置
-  const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
-  $('#repo').val(cfg.repo || '');
-  $('#token').val(cfg.token || '');
-  $('#path').val(cfg.path || '');
-  currentRepoInfo.repo = cfg.repo || '';
-  currentRepoInfo.path = (cfg.path || '').trim();
-
-  // 工具函数
-  const showMsg = (text, isError) => $('#msg').text(text).css('color', isError ? 'red' : 'black');
-  const getHeaders = () => {
-    const headers = { 'Accept': 'application/vnd.github.v3+json' };
-    const token = $('#token').val();
-    if (token) headers['Authorization'] = `token ${token}`;
-    return headers;
-  };
-
-  // 保存配置
-  const saveConfig = () => {
-    const configData = {
-      repo: $('#repo').val(),
-      token: $('#token').val(),
-      path: $('#path').val()
-    };
-    localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(configData));
-    // 更新当前仓库路径信息
-    currentRepoInfo.repo = configData.repo;
-    currentRepoInfo.path = (configData.path || '').trim();
-  };
-
-  // 保存缓存
-  const saveCache = () => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.cache, JSON.stringify(questionCache));
-    } catch (e) {
-      console.error('缓存保存失败', e);
-    }
-  };
-
-  // 新增：校验收藏题目是否属于当前仓库和路径
-  const isCollectMatchCurrentRepo = (collectItem) => {
-    // 如果还没加载任何仓库，不显示收藏
-    if (!currentRepoInfo.repo) return false;
-    
-    // 查找该收藏题目是否在当前加载的文件列表中
-    const isInCurrentFileList = fileList.some(file => file.name === collectItem.filename);
-    return isInCurrentFileList;
-  };
-
-  // 加载题目列表
-  $('#load-list').click(async function() {
-    const repo = $('#repo').val();
-    if (!repo || !repo.includes('/')) return showMsg('请输入正确的仓库格式：owner/repo', true);
-
-    const [owner, name] = repo.split('/');
-    const path = ($('#path').val() || '').trim();
-    const apiUrl = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
-
-    // 更新当前仓库路径信息
-    currentRepoInfo.repo = repo;
-    currentRepoInfo.path = path;
-
-    showMsg('加载中...');
-    try {
-      const res = await fetch(apiUrl, { headers: getHeaders() });
-      if (!res.ok) throw new Error(`请求失败：${res.status}`);
-      
-      const items = await res.json();
-      fileList = items.filter(item => item.type === 'file' && item.name.endsWith('.json'))
-                      .map(item => ({ name: item.name, apiUrl: item.url }));
-
-      if (fileList.length === 0) return showMsg('未找到JSON题目文件', true);
-      
-      renderList();
-      $('#main').show();
-      saveConfig();
-      showMsg(`加载成功：${fileList.length} 个题目`);
-    } catch (err) {
-      showMsg('加载失败：' + err.message, true);
-    }
-  });
-
-  // 渲染题目列表
-  const renderList = () => {
-    let html = '';
-    fileList.forEach((file, idx) => {
-      html += `<div class="q-item" data-idx="${idx}">${idx + 1}. ${file.name}</div>`;
-    });
-    $('#list-items').html(html).find('.q-item').click(function() {
-      loadQuestion($(this).data('idx'));
-    });
-  };
-
-  // 加载并显示题目
-  const loadQuestion = async (idx) => {
-    currentFile = fileList[idx];
-    $('#question-content').text('加载中...');
-    excludedOptions = [];
-
-    try {
-      // 优先使用缓存
-      let question = questionCache[currentFile.name];
-      if (!question) {
-        const res = await fetch(currentFile.apiUrl, { headers: getHeaders() });
-        if (!res.ok) throw new Error(`请求失败：${res.status}`);
-        
-        const fileData = await res.json();
-        // 解析Base64内容
-        const binaryStr = atob(fileData.content.replace(/\s+/g, ''));
-        const uint8Array = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-          uint8Array[i] = binaryStr.charCodeAt(i);
-        }
-        question = JSON.parse(new TextDecoder('utf-8').decode(uint8Array));
-        
-        // 存入缓存
-        questionCache[currentFile.name] = question;
-        saveCache();
-      }
-
-      // 显示题目
-      showQuestion(question);
-    } catch (err) {
-      $('#question-content').text('加载失败：' + err.message);
-    }
-  };
-
-  // 显示题目内容
-  const showQuestion = (q) => {
-    let options = '';
-    q.option.forEach((opt, optIdx) => {
-      const key = opt.charAt(0);
-      const isExcluded = excludedOptions.includes(optIdx);
-      const optionClass = isExcluded ? 'option-excluded' : '';
-      options += `<label class="option-item ${optionClass}" data-opt-idx="${optIdx}">
-        <input type="radio" name="answer" value="${key}"> ${opt}
-      </label><br>`;
-    });
-
-    const isCollected = collected.some(c => c.filename === currentFile.name);
-    $('#question-content').html(`
-      <h3>${q.test}</h3>
-      <div id="options-container">${options}</div>
-      <button id="submit">提交答案</button>
-      <button id="collect">${isCollected ? '取消收藏' : '收藏'}</button>
-      <div id="result"></div>
-      <div id="analysis" style="display:none;">
-        <p><strong>解析：</strong>${q.point || ''}</p>
-        ${q.discuss ? `<p><strong>讨论：</strong>${q.discuss}</p>` : ''}
+    <!-- 题目列表+答题区 -->
+    <div style="display: flex; gap: 20px;">
+      <div style="flex: 1;">
+        <h4>题目列表</h4>
+        <div id="list-items"></div>
       </div>
-    `);
+      <div style="flex: 2;">
+        <div id="current-question">
+          <div id="question-content">请选择一道题目开始答题</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    // 绑定选项右键排除功能
-    $('.option-item').contextmenu(function(e) {
-      e.preventDefault(); // 阻止默认右键菜单
-      const optIdx = parseInt($(this).data('opt-idx'));
-      const $this = $(this);
+  <!-- 收藏弹窗 -->
+  <div id="collect-modal" style="display:none; position:fixed; top:20%; left:20%; width:60%; background:#fff; border:1px solid #ccc; padding:20px; z-index:1000;">
+    <h3>我的收藏</h3>
+    <div id="collect-items"></div>
+    <br><button id="close-collect">关闭</button>
+  </div>
+
+  <script>
+    $(function() {
+      // 存储键名
+      const STORAGE_KEYS = { config: 'jq_github_config', collected: 'jq_collected', finished: 'jq_finished', cache: 'jq_questions_cache', wrong: 'jq_wrong_questions' };
+      // 全局状态
+      let fileList = [], questionCache = JSON.parse(localStorage.getItem(STORAGE_KEYS.cache) || '{}');
+      let currentFile = null, currentMode = 'recite'; // 默认背题模式
+      let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
+      let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
+      let wrongQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.wrong) || '[]'); // 错题本
+      let excludedOptions = [], currentRepoInfo = { repo: '', path: '' };
       
-      // 切换排除状态
-      if (excludedOptions.includes(optIdx)) {
-        // 恢复选项
-        excludedOptions = excludedOptions.filter(idx => idx !== optIdx);
-        $this.removeClass('option-excluded');
-      } else {
-        // 排除选项
-        excludedOptions.push(optIdx);
-        $this.addClass('option-excluded');
-      }
-    });
+      // 初始化配置
+      const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
+      $('#repo').val(cfg.repo || ''); $('#token').val(cfg.token || ''); $('#path').val(cfg.path || '');
+      currentRepoInfo.repo = cfg.repo || ''; currentRepoInfo.path = (cfg.path || '').trim();
 
-    // 绑定原有事件
-    $('#submit').click(() => checkAnswer(q));
-    $('#collect').click(() => toggleCollect(q));
-  };
+      // 工具函数
+      const showMsg = (text, isError) => $('#msg').text(text).css('color', isError ? 'red' : 'black');
+      const getHeaders = () => {
+        const headers = { 'Accept': 'application/vnd.github.v3+json' };
+        if ($('#token').val()) headers['Authorization'] = `token ${$('#token').val()}`;
+        return headers;
+      };
+      const saveConfig = () => {
+        const configData = { repo: $('#repo').val(), token: $('#token').val(), path: $('#path').val() };
+        localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(configData));
+        currentRepoInfo.repo = configData.repo; currentRepoInfo.path = (configData.path || '').trim();
+      };
+      const saveCache = () => { try { localStorage.setItem(STORAGE_KEYS.cache, JSON.stringify(questionCache)); } catch (e) { console.error('缓存保存失败', e); } };
+      const isCollectMatchCurrentRepo = (item) => fileList.some(file => file.name === item.filename); // 收藏仓库匹配
+      const refreshAnswerCard = () => { // 刷新答题卡
+        if (fileList.length === 0) { $('#card-list').html('未答题'); return; }
+        let cardHtml = '';
+        fileList.forEach((file, idx) => {
+          const isAnswered = finished.includes(file.name);
+          const isWrong = wrongQuestions.some(w => w.filename === file.name);
+          let cardClass = 'card-item';
+          if (isWrong) cardClass += ' card-wrong';
+          else if (isAnswered) cardClass += ' card-answered';
+          cardHtml += `<span class="${cardClass}" data-idx="${idx}">${idx+1}</span>`;
+        });
+        $('#card-list').html(cardHtml);
+        // 答题卡点击跳转到对应题目
+        $('.card-item').click(function() { loadQuestion($(this).data('idx')); });
+      };
 
-  // 提交并检查答案
-  const checkAnswer = (q) => {
-    const selected = $('input[name="answer"]:checked').val();
-    if (!selected) return alert('请选择答案');
-
-    const isCorrect = selected === q.answer;
-    $('#result').text(`${isCorrect ? '回答正确！' : '回答错误！'} 正确答案：${q.answer}`);
-    $('#analysis').show();
-
-    // 记录完成状态
-    if (!finished.includes(currentFile.name)) {
-      finished.push(currentFile.name);
-      localStorage.setItem(STORAGE_KEYS.finished, JSON.stringify(finished));
-    }
-
-    // 下一题按钮
-    const currentIdx = fileList.indexOf(currentFile);
-    if (currentIdx < fileList.length - 1) {
-      $('#question-content').append('<button id="next">下一题</button>');
-      $('#next').click(() => loadQuestion(currentIdx + 1));
-    }
-  };
-
-  // 收藏/取消收藏
-  const toggleCollect = (q) => {
-    const idx = collected.findIndex(c => c.filename === currentFile.name);
-    if (idx >= 0) {
-      collected.splice(idx, 1);
-    } else {
-      // 收藏时记录当前仓库和路径信息
-      collected.push({ 
-        filename: currentFile.name, 
-        repo: currentRepoInfo.repo,
-        path: currentRepoInfo.path,
-        ...q 
+      // 1. 加载GitHub题目列表
+      $('#load-list').click(async function() {
+        const repo = $('#repo').val();
+        if (!repo || !repo.includes('/')) return showMsg('请输入正确的仓库格式：owner/repo', true);
+        const [owner, name] = repo.split('/');
+        const path = ($('#path').val() || '').trim();
+        const apiUrl = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
+        showMsg('加载中...');
+        try {
+          const res = await fetch(apiUrl, { headers: getHeaders() });
+          if (!res.ok) throw new Error(`请求失败：${res.status}`);
+          const items = await res.json();
+          fileList = items.filter(item => item.type === 'file' && item.name.endsWith('.json')).map(item => ({ name: item.name, apiUrl: item.url }));
+          if (fileList.length === 0) return showMsg('未找到JSON题目文件', true);
+          renderList(); refreshAnswerCard(); // 初始化答题卡
+          $('#main').show(); saveConfig(); showMsg(`加载成功：${fileList.length} 个题目`);
+        } catch (err) { showMsg('加载失败：' + err.message, true); }
       });
-    }
-    localStorage.setItem(STORAGE_KEYS.collected, JSON.stringify(collected));
-    $('#collect').text(idx >= 0 ? '收藏' : '取消收藏');
-  };
 
-  // 收藏列表（新增匹配校验）
-  $('#show-collect').click(function() {
-    // 过滤出属于当前仓库和路径的收藏题目
-    const matchedCollects = collected.filter(isCollectMatchCurrentRepo);
-    let html = '';
-    
-    if (matchedCollects.length === 0) {
-      html = '<p>暂无当前仓库的收藏题目</p>';
-    } else {
-      matchedCollects.forEach((item, i) => {
-        html += `<div class="collect-item" data-i="${i}">${item.test.substring(0, 50)}...</div>`;
+      // 2. 渲染题目列表
+      const renderList = () => {
+        let html = '';
+        fileList.forEach((file, idx) => {
+          const isFinished = finished.includes(file.name);
+          const isWrong = wrongQuestions.some(w => w.filename === file.name);
+          html += `<div class="q-item" data-idx="${idx}" style="padding:5px; border-bottom:1px solid #eee; cursor:pointer;">
+            ${idx + 1}. ${file.name} ${isWrong ? '[错题]' : isFinished ? '[已答]' : ''}
+          </div>`;
+        });
+        $('#list-items').html(html).find('.q-item').click(function() { loadQuestion($(this).data('idx')); });
+      };
+
+      // 3. 加载并显示题目
+      const loadQuestion = async (idx) => {
+        currentFile = fileList[idx]; $('#question-content').text('加载中...'); excludedOptions = [];
+        try {
+          let question = questionCache[currentFile.name];
+          if (!question) { // 无缓存则从GitHub加载
+            const res = await fetch(currentFile.apiUrl, { headers: getHeaders() });
+            if (!res.ok) throw new Error(`请求失败：${res.status}`);
+            const fileData = await res.json();
+            const binaryStr = atob(fileData.content.replace(/\s+/g, ''));
+            const uint8Array = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) uint8Array[i] = binaryStr.charCodeAt(i);
+            question = JSON.parse(new TextDecoder('utf-8').decode(uint8Array));
+            questionCache[currentFile.name] = question; saveCache();
+          }
+          showQuestion(question); // 渲染题目
+        } catch (err) { $('#question-content').text('加载失败：' + err.message); }
+      };
+
+      // 4. 显示题目（区分背题/考试模式）
+      const showQuestion = (q) => {
+        let options = '';
+        q.option.forEach((opt, optIdx) => {
+          const key = opt.charAt(0);
+          const isExcluded = excludedOptions.includes(optIdx);
+          const optionClass = isExcluded ? 'option-excluded' : '';
+          options += `<label class="option-item ${optionClass}" data-opt-idx="${optIdx}">
+            <input type="radio" name="answer" value="${key}"> ${opt}
+          </label><br>`;
+        });
+        // 考试模式：隐藏答案和解析；背题模式：默认显示
+        const analysisHtml = currentMode === 'exam' ? 
+          '<div id="analysis" style="display:none;"><p><strong>解析：</strong></p></div>' : 
+          `<div id="analysis" style="margin-top:10px;"><p><strong>解析：</strong>${q.point || ''}</p>
+          ${q.discuss ? `<p><strong>讨论：</strong>${q.discuss}</p>` : ''}</div>`;
+        // 收藏状态
+        const isCollected = collected.some(c => c.filename === currentFile.name);
+        const collectText = isCollected ? '取消收藏' : '收藏';
+        // 拼接题目html
+        let html = `
+          <h3>${q.test}</h3>
+          <div id="options-container">${options}</div>
+          <button id="submit">提交答案</button>
+          <button id="collect">${collectText}</button>
+          <div id="result" style="margin:10px 0;"></div>
+          ${analysisHtml}
+        `;
+        $('#question-content').html(html);
+        // 绑定事件：右键排错、提交、收藏
+        bindQuestionEvents(q);
+      };
+
+      // 5. 绑定题目相关事件（右键排错、提交、收藏）
+      const bindQuestionEvents = (q) => {
+        // 右键排除选项
+        $('.option-item').contextmenu(function(e) {
+          e.preventDefault();
+          const optIdx = parseInt($(this).data('opt-idx'));
+          if (excludedOptions.includes(optIdx)) {
+            excludedOptions = excludedOptions.filter(idx => idx !== optIdx);
+            $(this).removeClass('option-excluded');
+          } else { excludedOptions.push(optIdx); $(this).addClass('option-excluded'); }
+        });
+        // 提交答案
+        $('#submit').click(() => checkAnswer(q));
+        // 收藏/取消收藏
+        $('#collect').click(() => toggleCollect(q));
+      };
+
+      // 6. 检查答案（记录错题、更新答题卡、区分模式）
+      const checkAnswer = (q) => {
+        const selected = $('input[name="answer"]:checked').val();
+        if (!selected) return alert('请选择答案');
+        const isCorrect = selected === q.answer;
+        // 更新结果提示
+        $('#result').css('color', isCorrect ? 'green' : 'red').text(`${isCorrect ? '回答正确！' : '回答错误！'} 正确答案：${q.answer}`);
+        // 考试模式下提交后显示解析
+        if (currentMode === 'exam') {
+          $('#analysis').html(`<p><strong>解析：</strong>${q.point || ''}</p>
+            ${q.discuss ? `<p><strong>讨论：</strong>${q.discuss}</p>` : ''}`).show();
+        }
+        // 记录完成状态
+        if (!finished.includes(currentFile.name)) {
+          finished.push(currentFile.name);
+          localStorage.setItem(STORAGE_KEYS.finished, JSON.stringify(finished));
+        }
+        // 记录错题：错误且未在错题本中
+        const isInWrong = wrongQuestions.some(w => w.filename === currentFile.name);
+        if (!isCorrect && !isInWrong) {
+          wrongQuestions.push({ filename: currentFile.name, ...q, userAnswer: selected });
+          localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
+        }
+        // 正确则从错题本移除
+        if (isCorrect && isInWrong) {
+          wrongQuestions = wrongQuestions.filter(w => w.filename !== currentFile.name);
+          localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
+        }
+        // 刷新列表和答题卡
+        renderList(); refreshAnswerCard();
+        // 下一题按钮
+        const currentIdx = fileList.indexOf(currentFile);
+        if (currentIdx < fileList.length - 1) {
+          $('#question-content').append('<br><button id="next" style="margin-top:10px;">下一题</button>');
+          $('#next').click(() => loadQuestion(currentIdx + 1));
+        }
+      };
+
+      // 7. 收藏/取消收藏（关联仓库路径）
+      const toggleCollect = (q) => {
+        const idx = collected.findIndex(c => c.filename === currentFile.name);
+        if (idx >= 0) collected.splice(idx, 1);
+        else collected.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q });
+        localStorage.setItem(STORAGE_KEYS.collected, JSON.stringify(collected));
+        $('#collect').text(idx >= 0 ? '收藏' : '取消收藏');
+      };
+
+      // 8. 模式切换（背题/考试）
+      $('.mode-btn').click(function() {
+        $('.mode-btn').removeClass('mode-active');
+        $(this).addClass('mode-active');
+        currentMode = $(this).data('mode');
+        // 切换后刷新当前题目
+        if (currentFile) {
+          const currentIdx = fileList.indexOf(currentFile);
+          loadQuestion(currentIdx);
+        }
       });
-    }
-    
-    $('#collect-items').html(html);
-    $('#collect-modal').show();
 
-    $('.collect-item').click(function() {
-      const i = $(this).data('i');
-      const item = matchedCollects[i]; // 注意：使用过滤后的列表
-      const file = fileList.find(f => f.name === item.filename);
-      if (file) {
-        loadQuestion(fileList.indexOf(file));
-        $('#collect-modal').hide();
-      }
+      // 9. 导出错题本（JSON格式）
+      $('#export-wrong').click(function() {
+        if (wrongQuestions.length === 0) return alert('暂无错题！');
+        const wrongJson = JSON.stringify(wrongQuestions, null, 2);
+        const blob = new Blob([wrongJson], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `医学刷题-错题本-${new Date().toLocaleDateString()}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showMsg('错题本导出成功！', false);
+      });
+
+      // 10. 收藏列表（仓库匹配过滤）
+      $('#show-collect').click(function() {
+        const matchedCollects = collected.filter(isCollectMatchCurrentRepo);
+        let html = matchedCollects.length === 0 ? '<p>暂无当前仓库的收藏题目</p>' : '';
+        matchedCollects.forEach((item, i) => {
+          html += `<div class="collect-item" data-i="${i}" style="padding:8px; border-bottom:1px solid #ddd; cursor:pointer;">
+            ${item.test.substring(0, 60)}...
+          </div>`;
+        });
+        $('#collect-items').html(html); $('#collect-modal').show();
+        $('.collect-item').click(function() {
+          const item = matchedCollects[$(this).data('i')];
+          const file = fileList.find(f => f.name === item.filename);
+          if (file) { loadQuestion(fileList.indexOf(file)); $('#collect-modal').hide(); }
+        });
+      });
+      $('#close-collect').click(() => $('#collect-modal').hide());
+
+      // 11. 重置所有数据
+      $('#reset-all').click(function() {
+        if (confirm('确定重置所有进度、收藏、错题和缓存？')) {
+          Object.keys(STORAGE_KEYS).forEach(key => localStorage.removeItem(STORAGE_KEYS[key]));
+          collected = []; finished = []; wrongQuestions = []; questionCache = {}; excludedOptions = [];
+          renderList(); refreshAnswerCard();
+          $('#question-content').text('请选择一道题目开始答题');
+          showMsg('所有数据已重置！', false);
+        }
+      });
     });
-  });
-
-  $('#close-collect').click(() => $('#collect-modal').hide());
-
-  // 重置所有数据
-  $('#reset-all').click(function() {
-    if (confirm('确定重置所有进度、收藏和缓存？')) {
-      localStorage.removeItem(STORAGE_KEYS.finished);
-      localStorage.removeItem(STORAGE_KEYS.collected);
-      localStorage.removeItem(STORAGE_KEYS.cache);
-      collected = [];
-      finished = [];
-      questionCache = {};
-      excludedOptions = [];
-      renderList();
-      $('#question-content').text('请选择一道题目开始答题');
-    }
-  });
-});
-</script>
-
+  </script>
 </body>
 </html>
