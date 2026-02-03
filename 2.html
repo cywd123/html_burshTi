@@ -69,14 +69,20 @@ $(function() {
   let currentFile = null;
   let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
   let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
-  // 新增：存储当前题目被排除的选项
   let excludedOptions = [];
+  // 新增：存储当前加载的仓库和路径信息
+  let currentRepoInfo = {
+    repo: '',
+    path: ''
+  };
 
   // 初始化：加载配置
   const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
   $('#repo').val(cfg.repo || '');
   $('#token').val(cfg.token || '');
   $('#path').val(cfg.path || '');
+  currentRepoInfo.repo = cfg.repo || '';
+  currentRepoInfo.path = (cfg.path || '').trim();
 
   // 工具函数
   const showMsg = (text, isError) => $('#msg').text(text).css('color', isError ? 'red' : 'black');
@@ -88,11 +94,17 @@ $(function() {
   };
 
   // 保存配置
-  const saveConfig = () => localStorage.setItem(STORAGE_KEYS.config, JSON.stringify({
-    repo: $('#repo').val(),
-    token: $('#token').val(),
-    path: $('#path').val()
-  }));
+  const saveConfig = () => {
+    const configData = {
+      repo: $('#repo').val(),
+      token: $('#token').val(),
+      path: $('#path').val()
+    };
+    localStorage.setItem(STORAGE_KEYS.config, JSON.stringify(configData));
+    // 更新当前仓库路径信息
+    currentRepoInfo.repo = configData.repo;
+    currentRepoInfo.path = (configData.path || '').trim();
+  };
 
   // 保存缓存
   const saveCache = () => {
@@ -103,6 +115,16 @@ $(function() {
     }
   };
 
+  // 新增：校验收藏题目是否属于当前仓库和路径
+  const isCollectMatchCurrentRepo = (collectItem) => {
+    // 如果还没加载任何仓库，不显示收藏
+    if (!currentRepoInfo.repo) return false;
+    
+    // 查找该收藏题目是否在当前加载的文件列表中
+    const isInCurrentFileList = fileList.some(file => file.name === collectItem.filename);
+    return isInCurrentFileList;
+  };
+
   // 加载题目列表
   $('#load-list').click(async function() {
     const repo = $('#repo').val();
@@ -111,6 +133,10 @@ $(function() {
     const [owner, name] = repo.split('/');
     const path = ($('#path').val() || '').trim();
     const apiUrl = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
+
+    // 更新当前仓库路径信息
+    currentRepoInfo.repo = repo;
+    currentRepoInfo.path = path;
 
     showMsg('加载中...');
     try {
@@ -147,7 +173,6 @@ $(function() {
   const loadQuestion = async (idx) => {
     currentFile = fileList[idx];
     $('#question-content').text('加载中...');
-    // 新增：加载新题目时清空排除的选项
     excludedOptions = [];
 
     try {
@@ -183,7 +208,6 @@ $(function() {
     let options = '';
     q.option.forEach((opt, optIdx) => {
       const key = opt.charAt(0);
-      // 新增：判断当前选项是否被排除，添加对应的样式类
       const isExcluded = excludedOptions.includes(optIdx);
       const optionClass = isExcluded ? 'option-excluded' : '';
       options += `<label class="option-item ${optionClass}" data-opt-idx="${optIdx}">
@@ -204,7 +228,7 @@ $(function() {
       </div>
     `);
 
-    // 新增：绑定选项右键排除功能
+    // 绑定选项右键排除功能
     $('.option-item').contextmenu(function(e) {
       e.preventDefault(); // 阻止默认右键菜单
       const optIdx = parseInt($(this).data('opt-idx'));
@@ -256,23 +280,38 @@ $(function() {
     if (idx >= 0) {
       collected.splice(idx, 1);
     } else {
-      collected.push({ filename: currentFile.name, ...q });
+      // 收藏时记录当前仓库和路径信息
+      collected.push({ 
+        filename: currentFile.name, 
+        repo: currentRepoInfo.repo,
+        path: currentRepoInfo.path,
+        ...q 
+      });
     }
     localStorage.setItem(STORAGE_KEYS.collected, JSON.stringify(collected));
     $('#collect').text(idx >= 0 ? '收藏' : '取消收藏');
   };
 
-  // 收藏列表
+  // 收藏列表（新增匹配校验）
   $('#show-collect').click(function() {
-    let html = collected.length === 0 ? '<p>暂无收藏</p>' : '';
-    collected.forEach((item, i) => {
-      html += `<div class="collect-item" data-i="${i}">${item.test.substring(0, 50)}...</div>`;
-    });
+    // 过滤出属于当前仓库和路径的收藏题目
+    const matchedCollects = collected.filter(isCollectMatchCurrentRepo);
+    let html = '';
+    
+    if (matchedCollects.length === 0) {
+      html = '<p>暂无当前仓库的收藏题目</p>';
+    } else {
+      matchedCollects.forEach((item, i) => {
+        html += `<div class="collect-item" data-i="${i}">${item.test.substring(0, 50)}...</div>`;
+      });
+    }
+    
     $('#collect-items').html(html);
     $('#collect-modal').show();
 
     $('.collect-item').click(function() {
-      const item = collected[$(this).data('i')];
+      const i = $(this).data('i');
+      const item = matchedCollects[i]; // 注意：使用过滤后的列表
       const file = fileList.find(f => f.name === item.filename);
       if (file) {
         loadQuestion(fileList.indexOf(file));
@@ -292,7 +331,7 @@ $(function() {
       collected = [];
       finished = [];
       questionCache = {};
-      excludedOptions = []; // 清空排除选项
+      excludedOptions = [];
       renderList();
       $('#question-content').text('请选择一道题目开始答题');
     }
