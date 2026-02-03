@@ -192,6 +192,32 @@ $(function() {
 
     const isCollectMatchCurrentRepo = (item) => fileList.some(file => file.name === item.filename);
 
+    // 预加载题目
+    const preloadQuestions = async (currentIndex) => {
+        const start = Math.max(0, currentIndex - 5);
+        const end = Math.min(fileList.length - 1, currentIndex + 5);
+        
+        for (let i = start; i <= end; i++) {
+            if (!questionCache[fileList[i].name]) {
+                try {
+                    const res = await fetch(fileList[i].apiUrl, { headers: getHeaders() });
+                    if (!res.ok) continue;
+                    
+                    const fileData = await res.json();
+                    const binaryStr = atob(fileData.content.replace(/\s+/g, ''));
+                    const uint8Array = new Uint8Array(binaryStr.length);
+                    for (let j = 0; j < binaryStr.length; j++) uint8Array[j] = binaryStr.charCodeAt(j);
+                    const question = JSON.parse(new TextDecoder('utf-8').decode(uint8Array));
+                    
+                    questionCache[fileList[i].name] = question;
+                } catch (err) {
+                    console.error(`预加载题目失败: ${fileList[i].name}`, err);
+                }
+            }
+        }
+        saveCache();
+    };
+
     // 刷新答题卡
     const refreshAnswerCard = () => {
         if (fileList.length === 0) { 
@@ -307,6 +333,9 @@ $(function() {
                 saveCache();
             }
             showQuestion(question); // 渲染题目
+            
+            // 启动预加载
+            preloadQuestions(idx);
         } catch (err) { 
             $('#question-content').html(`<div style="color:var(--wrong-border); padding:20px;"><p>加载失败：${err.message}</p></div>`); 
         }
