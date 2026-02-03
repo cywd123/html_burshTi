@@ -231,7 +231,7 @@
     .q-option.wrong-answer .checkbox-square::after { display: block; }
     
     /* Multi-Choice Actions */
-    .multi-actions { margin-bottom: 20px; }
+    .multi-actions { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
     .multi-check-btn { 
         padding: 8px 20px; background-color: var(--secondary-color); color: white; 
         border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500;
@@ -448,6 +448,57 @@
         background-color: var(--accent-color);
     }
 
+    /* Stats Panel */
+    .stats-panel {
+        background: var(--card-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        padding: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .stats-panel h3 {
+        color: var(--primary-color);
+        margin-bottom: 15px;
+        font-size: 1.2rem;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+    .stat-item {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background: var(--bg-color);
+    }
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        margin-bottom: 5px;
+    }
+    .stat-label {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    /* Loading spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0, 95, 115, 0.3);
+        border-radius: 50%;
+        border-top-color: var(--primary-color);
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
     @media (max-width: 992px) { 
         aside { position: fixed; transform: translateX(-100%); width: 80%; max-width: 300px; box-shadow: 5px 0 15px rgba(0,0,0,0.1); } 
         aside.open { transform: translateX(0); }
@@ -488,12 +539,41 @@
             <div id="msg" class="msg"></div>
         </div>
 
+        <!-- 统计面板 -->
+        <div class="stats-panel" id="stats-panel" style="display:none;">
+            <h3>学习统计</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="total-count">0</div>
+                    <div class="stat-label">总题数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="completed-count">0</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="correct-count">0</div>
+                    <div class="stat-label">答对</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="wrong-count">0</div>
+                    <div class="stat-label">错题</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="accuracy-rate">0%</div>
+                    <div class="stat-label">正确率</div>
+                </div>
+            </div>
+        </div>
+
         <!-- 功能按钮区 -->
         <div class="func-buttons" id="func-buttons" style="display:none;">
             <button class="func-btn" id="show-collect">我的收藏</button>
             <button class="func-btn" id="reset-all">重置进度</button>
             <button class="func-btn" id="export-wrong">导出错题本</button>
             <button class="func-btn" id="open-dashboard">打开答题卡</button>
+            <button class="func-btn" id="random-question">随机练习</button>
+            <button class="func-btn" id="review-wrong">错题回顾</button>
         </div>
 
         <!-- 模式切换区 -->
@@ -549,7 +629,8 @@ $(function() {
         collected: 'jq_collected', 
         finished: 'jq_finished', 
         cache: 'jq_questions_cache', 
-        wrong: 'jq_wrong_questions' 
+        wrong: 'jq_wrong_questions',
+        stats: 'jq_stats'
     };
 
     // 全局状态
@@ -559,6 +640,7 @@ $(function() {
     let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
     let wrongQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.wrong) || '[]'); // 错题本
     let excludedOptions = [], currentRepoInfo = { repo: '', path: '' };
+    let currentStats = JSON.parse(localStorage.getItem(STORAGE_KEYS.stats) || '{"correct":0,"wrong":0,"total":0}');
 
     // 初始化配置
     const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
@@ -590,6 +672,23 @@ $(function() {
     const saveCache = () => { 
         try { localStorage.setItem(STORAGE_KEYS.cache, JSON.stringify(questionCache)); } 
         catch (e) { console.error('缓存保存失败', e); } 
+    };
+
+    const saveStats = () => {
+        localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(currentStats));
+    };
+
+    const updateStatsDisplay = () => {
+        const total = currentStats.total;
+        const correct = currentStats.correct;
+        const wrong = currentStats.wrong;
+        const accuracyRate = total > 0 ? Math.round((correct / total) * 100) : 0;
+        
+        $('#total-count').text(total);
+        $('#completed-count').text(finished.length);
+        $('#correct-count').text(correct);
+        $('#wrong-count').text(wrong);
+        $('#accuracy-rate').text(`${accuracyRate}%`);
     };
 
     const isCollectMatchCurrentRepo = (item) => fileList.some(file => file.name === item.filename);
@@ -628,6 +727,8 @@ $(function() {
         const apiUrl = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
         
         showMsg('加载中...', false);
+        $(this).prop('disabled', true).html('<span class="loading-spinner"></span> 加载中...');
+        
         try {
             const res = await fetch(apiUrl, { headers: getHeaders() });
             if (!res.ok) throw new Error(`请求失败：${res.status}`);
@@ -641,11 +742,15 @@ $(function() {
             // 渲染侧边栏题目列表
             renderQuestionSidebar();
             // 显示功能按钮和模式切换
-            $('#func-buttons, #mode-controls').show();
+            $('#func-buttons, #mode-controls, #stats-panel').show();
             // 显示题目列表侧边栏项
             $('#question-list-item').show();
             // 刷新答题卡
             refreshAnswerCard();
+            // 更新统计数据
+            currentStats.total = fileList.length;
+            saveStats();
+            updateStatsDisplay();
             // 清空题目展示区默认提示
             $('#question-content').html('<div style="text-align: center; margin-top: 50px; color: #6c757d;"><p>请从左侧菜单选择题目开始刷题</p></div>');
             
@@ -653,6 +758,8 @@ $(function() {
             showMsg(`加载成功：${fileList.length} 个题目`, false);
         } catch (err) { 
             showMsg('加载失败：' + err.message, true); 
+        } finally {
+            $(this).prop('disabled', false).text('加载题目列表');
         }
     });
 
@@ -749,6 +856,8 @@ $(function() {
                 <div class="multi-actions">
                     <button class="multi-check-btn" id="submit-answer">提交答案</button>
                     <button class="multi-check-btn" style="margin-left:10px;" id="collect-btn">${collectText}</button>
+                    <button class="multi-check-btn" style="margin-left:10px;" id="exclude-options">排除选项</button>
+                    <button class="multi-check-btn" style="margin-left:10px;" id="clear-exclude">清空排除</button>
                 </div>
                 ${analysisHtml}
                 <div id="next-btn-container" style="margin-top:20px; display:none;">
@@ -764,10 +873,8 @@ $(function() {
             if ($('#q-options').hasClass('answered')) return; // 已提交则不可选
             // 取消其他选项选中状态
             $('.q-option').removeClass('selected-neutral');
-            $('.q-option .radio-circle::after').css({ opacity: 0, transform: 'scale(0)' });
             // 设置当前选项选中
             $(this).addClass('selected-neutral');
-            $(this).find('.radio-circle::after').css({ opacity: 1, transform: 'scale(1)' });
         });
 
         // 绑定右键排除选项事件
@@ -788,12 +895,34 @@ $(function() {
 
         // 收藏事件
         $('#collect-btn').click(() => toggleCollect(q));
+
+        // 排除选项事件
+        $('#exclude-options').click(() => {
+            const selectedOption = $('.q-option.selected-neutral');
+            if (!selectedOption.length) {
+                showMsg('请先选择一个选项', true);
+                return;
+            }
+            const optIdx = parseInt(selectedOption.data('opt-idx'));
+            if (!excludedOptions.includes(optIdx)) {
+                excludedOptions.push(optIdx);
+                selectedOption.addClass('option-excluded');
+                showMsg('已排除此选项', false);
+            }
+        });
+
+        // 清空排除事件
+        $('#clear-exclude').click(() => {
+            excludedOptions = [];
+            $('.q-option').removeClass('option-excluded');
+            showMsg('已清空排除选项', false);
+        });
     };
 
     // 检查答案
     const checkAnswer = (q) => {
         const selectedOption = $('.q-option.selected-neutral');
-        if (!selectedOption.length) return alert('请选择答案');
+        if (!selectedOption.length) return showMsg('请选择答案', true);
         
         const selectedKey = selectedOption.data('key');
         const isCorrect = selectedKey === q.answer;
@@ -839,7 +968,7 @@ $(function() {
         // 记录错题
         const isInWrong = wrongQuestions.some(w => w.filename === currentFile.name);
         if (!isCorrect && !isInWrong) {
-            wrongQuestions.push({ filename: currentFile.name, ...q, userAnswer: selectedKey });
+            wrongQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey });
             localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
         }
         // 正确则移除错题
@@ -847,6 +976,19 @@ $(function() {
             wrongQuestions = wrongQuestions.filter(w => w.filename !== currentFile.name);
             localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
         }
+
+        // 更新统计
+        if (!isCorrect && !isInWrong) {
+            currentStats.wrong++;
+        } else if (isCorrect && isInWrong) {
+            currentStats.wrong--;
+        }
+        if (isCorrect && !finished.includes(currentFile.name)) {
+            currentStats.correct++;
+        }
+        currentStats.total = fileList.length;
+        saveStats();
+        updateStatsDisplay();
 
         // 刷新侧边栏和答题卡
         renderQuestionSidebar();
@@ -895,7 +1037,7 @@ $(function() {
         const blob = new Blob([wrongJson], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `医学刷题-错题本-${new Date().toLocaleDateString()}.json`;
+        a.download = `医学刷题-错题本-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
         
@@ -931,6 +1073,44 @@ $(function() {
         });
     });
 
+    // 随机练习
+    $('#random-question').click(function() {
+        if (fileList.length === 0) {
+            showMsg('请先加载题目', true);
+            return;
+        }
+        const randomIdx = Math.floor(Math.random() * fileList.length);
+        loadQuestion(randomIdx);
+    });
+
+    // 错题回顾
+    $('#review-wrong').click(function() {
+        if (wrongQuestions.length === 0) {
+            showMsg('暂无错题', true);
+            return;
+        }
+        // 过滤出当前仓库的错题
+        const currentRepoWrong = wrongQuestions.filter(w => 
+            w.repo === currentRepoInfo.repo && 
+            w.path === currentRepoInfo.path
+        );
+        
+        if (currentRepoWrong.length === 0) {
+            showMsg('当前仓库暂无错题', true);
+            return;
+        }
+        
+        // 随机选择一道错题
+        const randomWrong = currentRepoWrong[Math.floor(Math.random() * currentRepoWrong.length)];
+        const file = fileList.find(f => f.name === randomWrong.filename);
+        
+        if (file) {
+            loadQuestion(fileList.indexOf(file));
+        } else {
+            showMsg('题目不存在', true);
+        }
+    });
+
     // 重置所有数据
     $('#reset-all').click(function() {
         if (confirm('确定重置所有进度、收藏、错题和缓存？')) {
@@ -940,9 +1120,11 @@ $(function() {
             wrongQuestions = []; 
             questionCache = {}; 
             excludedOptions = [];
+            currentStats = { correct: 0, wrong: 0, total: 0 };
             
             renderQuestionSidebar();
             refreshAnswerCard();
+            updateStatsDisplay();
             $('#question-content').html('<div style="text-align: center; margin-top: 50px; color: #6c757d;"><p>所有数据已重置，请重新选择题目</p></div>');
             
             showMsg('所有数据已重置！', false);
@@ -969,6 +1151,9 @@ $(function() {
             $('#sidebar').removeClass('open');
         }
     });
+    
+    // 初始化统计显示
+    updateStatsDisplay();
 });
 
 // 侧边栏切换（移动端）
@@ -1011,3 +1196,6 @@ function toggleCollectModal(show) {
 </script>
 </body>
 </html>
+
+
+
