@@ -72,14 +72,14 @@
             <button class="func-btn" id="export-wrong">导出错题本</button>
             <button class="func-btn" id="open-dashboard">打开答题卡</button>
             <button class="func-btn" id="random-question">随机练习</button>
-            <button class="func-btn" id="review-wrong">错题回顾</button>
+            <button class="func-btn" id="review-wrong">随机错题回顾</button>
         </div>
 
         <!-- 模式切换区 -->
         <div class="mode-controls" id="mode-controls" style="display:none;">
             <span>刷题模式：</span>
             <button class="mode-btn active" data-mode="recite">背题模式</button>
-            <button class="mode-btn" data-mode="exam">考试模式</button>
+            <button class="mode-btn" data-mode="exam">答题模式</button>
         </div>
 
         <!-- 题目展示区 -->
@@ -294,8 +294,8 @@ $(function() {
         fileList.forEach((file, idx) => {
             const isFinished = finished.includes(file.name);
             const isWrong = wrongQuestions.some(w => w.filename === file.name);
-            const statusText = isWrong ? '[错题]' : isFinished ? '[已答]' : '';
-            html += `<li><button class="section-btn" data-idx="${idx}">${idx + 1}. ${file.name} ${statusText}</button></li>`;
+            const statusText = isWrong ? '[❌]' : isFinished ? '[✅]' : '';
+            html += `<li><button class="section-btn" data-idx="${idx}">${idx + 1} ${statusText}</button></li>`;
         });
         $('#question-section-list').html(html);
         
@@ -333,7 +333,10 @@ $(function() {
                 saveCache();
             }
             showQuestion(question); // 渲染题目
-            
+
+
+            $('#next-btn').click(() => loadQuestion(Math.min(idx + 1, fileList.length - 1)));
+            $('#prev-btn').click(() => loadQuestion(Math.max(idx - 1, 0)));
             // 启动预加载
             preloadQuestions(idx);
         } catch (err) { 
@@ -341,7 +344,7 @@ $(function() {
         }
     };
 
-    // 显示题目（适配新UI，区分背题/考试模式）
+    // 显示题目（适配新UI，区分背题/答题模式）
     const showQuestion = (q) => {
         // 构建选项HTML
         let optionsHtml = '';
@@ -373,10 +376,10 @@ $(function() {
             </div>`;
 
         // 拼接题目卡片HTML
-        const questionHtml = `
+        const questionHtml = currentMode === 'exam' ? `
             <div class="q-card" id="q-card">
                 <div class="q-meta">
-                    <span class="q-tag">单选题</span>
+                    <span class="q-tag">${q.mode}</span>
                     <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
                 </div>
                 <div class="q-text">${q.test}</div>
@@ -384,15 +387,29 @@ $(function() {
                 <div class="multi-actions">
                     <button class="multi-check-btn" id="submit-answer">提交答案</button>
                     <button class="multi-check-btn" style="margin-left:10px;" id="collect-btn">${collectText}</button>
-                    <button class="multi-check-btn" style="margin-left:10px;" id="exclude-options">排除选项</button>
                     <button class="multi-check-btn" style="margin-left:10px;" id="clear-exclude">清空排除</button>
                 </div>
                 ${analysisHtml}
-                <div id="next-btn-container" style="margin-top:20px; display:none;">
+                <div id="next-btn-container" style="margin-top:20px;">
+                    <button class="case-confirm-btn" id="prev-btn">上一题</button>
                     <button class="case-confirm-btn" id="next-btn">下一题</button>
                 </div>
             </div>
-        `;
+        ` : `
+            <div class="q-card" id="q-card">
+                <div class="q-meta">
+                    <span class="q-tag">${q.mode}</span>
+                    <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
+                </div>
+                <div class="q-text">${q.test}</div>
+                <ul class="q-options" id="q-options">${optionsHtml}</ul>
+                ${analysisHtml}
+                <div id="next-btn-container" style="margin-top:20px; ">
+                    <button class="case-confirm-btn" id="prev-btn">上一题</button>
+                    <button class="case-confirm-btn" id="next-btn">下一题</button>
+                </div>
+            </div>
+        `
 
         $('#question-content').html(questionHtml);
 
@@ -424,20 +441,6 @@ $(function() {
         // 收藏事件
         $('#collect-btn').click(() => toggleCollect(q));
 
-        // 排除选项事件
-        $('#exclude-options').click(() => {
-            const selectedOption = $('.q-option.selected-neutral');
-            if (!selectedOption.length) {
-                showMsg('请先选择一个选项', true);
-                return;
-            }
-            const optIdx = parseInt(selectedOption.data('opt-idx'));
-            if (!excludedOptions.includes(optIdx)) {
-                excludedOptions.push(optIdx);
-                selectedOption.addClass('option-excluded');
-                showMsg('已排除此选项', false);
-            }
-        });
 
         // 清空排除事件
         $('#clear-exclude').click(() => {
@@ -471,7 +474,7 @@ $(function() {
         $('#q-options').addClass('answered');
         $('#q-card').addClass('answered');
 
-        // 显示解析（考试模式）
+        // 显示解析（答题模式）
         if (currentMode === 'exam') {
             const expClass = isCorrect ? 'correct' : 'wrong';
             const expHeader = isCorrect ? '回答正确 ✔' : '回答错误 ✘';
@@ -526,7 +529,6 @@ $(function() {
         const currentIdx = fileList.indexOf(currentFile);
         if (currentIdx < fileList.length - 1) {
             $('#next-btn-container').show();
-            $('#next-btn').click(() => loadQuestion(currentIdx + 1));
         }
     };
 
