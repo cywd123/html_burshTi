@@ -485,8 +485,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
+  opacity: 1;
+  display: none;
   transition: all 0.3s ease;
 }
 
@@ -630,8 +630,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
+  opacity: 1;
+  display: none;
   transition: all 0.3s ease;
 }
 
