@@ -194,8 +194,8 @@ $(function() {
 
     // 预加载题目
     const preloadQuestions = async (currentIndex) => {
-        const start = Math.max(0, currentIndex - 5);
-        const end = Math.min(fileList.length - 1, currentIndex + 5);
+        const start = Math.max(0, currentIndex - 8);
+        const end = Math.min(fileList.length - 1, currentIndex + 8);
         
         for (let i = start; i <= end; i++) {
             if (!questionCache[fileList[i].name]) {
@@ -267,7 +267,8 @@ $(function() {
             // 渲染侧边栏题目列表
             renderQuestionSidebar();
             // 显示功能按钮和模式切换
-            $('#func-buttons, #mode-controls, #stats-panel').show();
+            //$('#func-buttons, #mode-controls, #stats-panel').show();
+            $('#stats-panel').show();
             // 显示题目列表侧边栏项
             $('#question-list-item').show();
             // 刷新答题卡
@@ -301,9 +302,14 @@ $(function() {
         
         // 侧边栏题目点击事件
         $('.section-btn').click(function() {
+            $('#load-config-btn').removeClass('active');
+            $('#question-list-btn').addClass('active');
+            $('#func-buttons, #mode-controls').show();
+
             $('.section-btn').removeClass('active');
             $(this).addClass('active');
             loadQuestion($(this).data('idx'));
+            $('#github-config, #stats-panel').hide();
             // 移动端自动关闭侧边栏
             if ($(window).width() <= 992) {
                 $('#sidebar').removeClass('open');
@@ -655,10 +661,12 @@ $(function() {
         $(this).addClass('active');
         
         if ($(this).attr('id') === 'load-config-btn') {
-            $('#github-config').show();
+            $('#github-config, #stats-panel').show();
+            $('#func-buttons, #mode-controls').hide();
             $('#question-content').html('<div style="text-align: center; margin-top: 50px; color: #6c757d;"><h2 style="margin-bottom: 20px;">请先配置并加载GitHub题库</h2><p>填写仓库信息后点击「加载题目列表」开始刷题。</p></div>');
         } else {
-            $('#github-config').hide();
+            $('#github-config, #stats-panel').hide();
+            $('#func-buttons, #mode-controls').show();
             if (fileList.length === 0) {
                 $('#question-content').html('<div style="text-align: center; margin-top: 50px; color: #6c757d;"><p>暂无题目，请先加载GitHub题库</p></div>');
             }
