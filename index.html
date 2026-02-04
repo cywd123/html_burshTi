@@ -35,7 +35,12 @@
             <p>Token（私有仓库需要）：<input type="password" id="token" /></p>
             <p>路径（可选）：<input type="text" id="path" placeholder="questions/" /></p>
             <button id="load-list">加载题目列表</button><br/><br/>
-            <button id="toggleStyle">切换风格</button>
+            <select id="styleSelector">
+                <option value="Original.css">默认风格</option>
+                <option value="TokyoNightStorm.css">Tokyo Night Storm</option>
+                <option value="ObsidianLite.css">Obsidian Lite</option>
+                <option value="ObsidianDark.css">Obsidian Dark</option>
+            </select>
             <div id="msg" class="msg"></div>
         </div>
 
@@ -123,21 +128,19 @@
 
 <script>
 $(document).ready(function() {
-    $('#toggleStyle').click(function() {
-        var currentStyle = $('link[href$=".css"]').attr('href');
-        var newStyle;
+    // 初始化：获取当前使用的CSS文件，并设置下拉框默认选中项
+    var currentStyle = $('link[href$=".css"]').attr('href') || 'Original.css';
+    $('#styleSelector').val(currentStyle);
 
-        if (currentStyle.includes('Original.css')) {
-            newStyle = 'TokyoNightStorm.css';
-        } else if (currentStyle.includes('TokyoNightStorm.css')) {
-            newStyle = 'Original.css';
-        } else if (currentStyle.includes('light.css')) {
-            newStyle = 'default.css';
-        } else {
-            newStyle = 'default.css';
-        }
-
+    // 监听下拉选框的选择变化事件
+    $('#styleSelector').change(function() {
+        // 获取选中的新样式文件名
+        var newStyle = $(this).val();
+        // 修改CSS链接的href属性，切换样式
         $('link[href$=".css"]').attr('href', newStyle);
+        
+        // 可选：添加提示，告知用户样式已切换
+        console.log('样式已切换为：', newStyle);
     });
 });
 
