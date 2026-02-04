@@ -413,7 +413,7 @@ $(function() {
             const optionClass = isExcluded ? 'option-excluded' : '';
             
             optionsHtml += `<li class="q-option ${optionClass}" data-opt-idx="${optIdx}" data-key="${key}">
-                <span class="radio-circle"></span>
+                <span class="${q.answer.length<=1 ? 'radio-circle' : 'checkbox-square'}"></span>
                 <span class="opt-text">${opt}</span>
             </li>`;
         });
@@ -469,7 +469,7 @@ $(function() {
                 $('.q-option').removeClass('selected-neutral');
             }
             // 如果是checkbox-square，切换当前选项选中状态
-            else {
+            else if ($(this).find('.checkbox-square').length > 0) {
                 $(this).toggleClass('selected-neutral');
                 return;
             }
