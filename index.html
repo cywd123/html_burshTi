@@ -463,8 +463,16 @@ $(function() {
         // 绑定选项点击事件
         $('.q-option').click(function() {
             if ($('#q-options').hasClass('answered')) return; // 已提交则不可选
-            // 取消其他选项选中状态
-            $('.q-option').removeClass('selected-neutral');
+
+            // 如果是radio-circle，取消其他选项选中状态
+            if ($(this).find('.radio-circle').length > 0) {
+                $('.q-option').removeClass('selected-neutral');
+            }
+            // 如果是checkbox-square，切换当前选项选中状态
+            else {
+                $(this).toggleClass('selected-neutral');
+                return;
+            }
             // 设置当前选项选中
             $(this).addClass('selected-neutral');
         });
@@ -500,9 +508,15 @@ $(function() {
     // 检查答案
     const checkAnswer = (q) => {
         const selectedOption = $('.q-option.selected-neutral');
-        if (!selectedOption.length) return showMsg('请选择答案', true);
+        const selectedKeytmp = [];
+        selectedOption.each(function() {
+            // 取出当前选项的data-key值并加入数组
+            selectedKeytmp.push($(this).data('key'));
+        });
+        const selectedKey = selectedKeytmp.sort().join('');
         
-        const selectedKey = selectedOption.data('key');
+        console.log('Selected Key:', selectedKey);
+        if (!selectedOption.length) return showMsg('请选择答案', true);
         const isCorrect = selectedKey === q.answer;
 
         // 标记正确/错误选项
