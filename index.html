@@ -164,12 +164,35 @@ $(function() {
     let excludedOptions = [], currentRepoInfo = { repo: '', path: '' };
     let currentStats = JSON.parse(localStorage.getItem(STORAGE_KEYS.stats) || '{"correct":0,"wrong":0,"total":0}');
 
-    // 初始化配置
-    const cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.config) || '{}');
-    $('#repo').val(cfg.repo || ''); 
-    $('#token').val(cfg.token || ''); 
+
+    // 先读本地配置
+    let cfg = {};
+    try {
+    const stored = localStorage.getItem(STORAGE_KEYS.config);
+    if (stored) cfg = JSON.parse(stored);
+    } catch (e) {
+    console.error("Parse config failed:", e);
+    }
+
+    // 读URL参数并覆盖本地配置
+    const encodedInfo = new URLSearchParams(window.location.search).get('i');
+    if (encodedInfo) {
+    try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(encodedInfo)))));
+        if (decoded && typeof decoded === 'object') {
+        cfg.repo = decoded.repo || cfg.repo;
+        cfg.path = decoded.path || cfg.path;
+        }
+    } catch (e) {
+        console.error("Decode URL param failed:", e);
+    }
+    }
+
+    // 填充表单和全局变量
+    $('#repo').val(cfg.repo || '');
+    $('#token').val(cfg.token || '');
     $('#path').val(cfg.path || '');
-    currentRepoInfo.repo = cfg.repo || ''; 
+    currentRepoInfo.repo = cfg.repo || '';
     currentRepoInfo.path = (cfg.path || '').trim();
 
     // 工具函数
@@ -277,6 +300,14 @@ $(function() {
         showMsg('少女祈祷中⋯⋯', false);
         $(this).prop('disabled', true).html('<span class="loading-spinner"></span> 少女祈祷中⋯⋯');
         
+        // 读取repo和path的内容
+        Info={ repo: repo, path: path };
+        //Base64 Encode and log the Info object
+        console.log('当前仓库信息：', Info);
+        // url 添加参数i= base64编码后的Info对象，方便调试使用
+        window.history.replaceState(null, '', `${window.location.pathname}?i=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(Info))))) }`);
+
+
         try {
             const res = await fetch(apiUrl, { headers: getHeaders() });
             if (!res.ok) throw new Error(`请求失败：${res.status}`);
