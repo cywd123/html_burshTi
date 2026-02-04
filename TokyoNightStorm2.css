@@ -1,0 +1,945 @@
+/* 全局样式重置与基础设置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+:root {
+  /* Tokyo Night Storm 主题色 */
+  --bg-primary: #1a1b26;
+  --bg-secondary: #24283b;
+  --bg-tertiary: #343a46;
+  --text-primary: #a9b1d6;
+  --text-secondary: #89b4fa;
+  --accent-primary: #7aa2f7;
+  --accent-secondary: #bb9af7;
+  --accent-success: #9ece6a;
+  --accent-error: #f7768e;
+  --border-color: #414868;
+  --hover-color: #363b54;
+  --active-color: #4f5673;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  display: flex;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 侧边栏样式 */
+#sidebar {
+  width: 280px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  transition: transform 0.3s ease;
+  z-index: 100;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h2 {
+  color: var(--accent-primary);
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.chapter-list {
+  list-style: none;
+  padding: 10px 0;
+}
+
+.chapter-item {
+  margin: 5px 0;
+}
+
+.chapter-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background-color: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chapter-btn:hover {
+  background-color: var(--hover-color);
+}
+
+.chapter-btn.active {
+  background-color: var(--active-color);
+  color: var(--accent-secondary);
+  border-left: 3px solid var(--accent-secondary);
+}
+
+/* 核心修改：section-list 3列等宽全宽布局 */
+.section-list {
+  list-style: none;
+  padding: 10px;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 固定3列等分 */
+  gap: 0; /* 取消间距，用边框拼接 */
+  width: 100%; /* 强制占满父容器 */
+}
+
+/* 核心修改：section-btn 3列等宽样式 */
+.section-btn {
+  padding: 12px 0;
+  margin: 0;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 0; /* 取消圆角 */
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  text-align: center;
+  width: 100%; /* 占满单元格 */
+  height: 100%; /* 占满单元格 */
+  border-right: none; /* 隐藏右侧边框（最后一列除外） */
+  border-bottom: none; /* 隐藏下侧边框（最后一行除外） */
+}
+
+/* 修复最后一列的右侧边框 */
+.section-list li:nth-child(3n) .section-btn {
+  border-right: 1px solid var(--border-color);
+}
+
+/* 修复最后一行的下侧边框 */
+.section-list li:last-child .section-btn,
+.section-list li:nth-last-child(2):nth-child(3n-1) .section-btn,
+.section-list li:nth-last-child(3):nth-child(3n-2) .section-btn {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.section-btn:hover {
+  background-color: var(--hover-color);
+}
+
+.section-btn.active {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border-color: var(--accent-primary);
+  /* 选中状态强制显示边框，保证视觉完整 */
+  border-right: 1px solid var(--accent-primary) !important;
+  border-bottom: 1px solid var(--accent-primary) !important;
+}
+
+/* 菜单切换按钮 */
+.menu-toggle {
+  position: fixed;
+  top: 20px;
+  left: 10px;
+  z-index: 101;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: none;
+}
+
+/* 主内容区域 */
+#app-main {
+  flex: 1;
+  margin-left: 280px;
+  padding: 30px;
+  transition: margin-left 0.3s ease;
+}
+
+.content-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* GitHub配置区样式 */
+.github-config {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.github-config h3 {
+  color: var(--accent-primary);
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.github-config input {
+  width: 300px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  margin: 5px 0;
+}
+
+.github-config button, #styleSelector {
+  padding: 8px 15px;
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+#styleSelector {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+/* 统计面板样式 */
+.stats-panel {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.stats-panel h3 {
+  color: var(--accent-primary);
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 10px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--accent-secondary);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  opacity: 0.8;
+}
+
+/* 功能按钮区样式 */
+.func-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.func-btn {
+  padding: 10px 15px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.func-btn:hover {
+  background-color: var(--hover-color);
+  color: var(--accent-secondary);
+}
+
+/* 模式切换区样式 */
+.mode-controls {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mode-btn {
+  padding: 8px 15px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border-color: var(--accent-primary);
+}
+
+.mode-btn:hover:not(.active) {
+  background-color: var(--hover-color);
+}
+
+/* 提示消息样式 */
+.msg {
+  padding: 12px 20px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.msg.success {
+  background-color: rgba(158, 206, 106, 0.2);
+  border: 1px solid var(--accent-success);
+  color: var(--accent-success);
+}
+
+/* 题目卡片样式 */
+.q-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 20px;
+}
+
+.q-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.q-tag {
+  background-color: var(--accent-secondary);
+  color: var(--bg-primary);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* 多选题标签样式 */
+.q-tag.multi {
+  background-color: #ff9e64;
+}
+
+.q-text {
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  line-height: 1.8;
+}
+
+.q-options {
+  list-style: none;
+  margin-bottom: 20px;
+}
+
+.q-option {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.q-option:hover {
+  background-color: var(--hover-color);
+  border-color: var(--accent-secondary);
+}
+
+.q-option.selected {
+  background-color: var(--active-color);
+  border-color: var(--accent-primary);
+}
+
+/* multi-check-btn 样式 */
+.multi-check-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  margin: 0 5px 5px 0;
+}
+
+.multi-check-btn:hover {
+  background-color: var(--hover-color);
+  border-color: var(--accent-secondary);
+}
+
+.multi-check-btn.active {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border-color: var(--accent-primary);
+}
+
+/* 批量操作的多选按钮组容器 */
+.multi-check-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 15px 0;
+}
+
+.opt-text {
+  flex: 1;
+}
+
+/* 答案解析样式 */
+.explanation {
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 20px;
+  border-left: 4px solid var(--accent-success);
+  display: none;
+}
+
+/* 错题解析样式 */
+.explanation.wrong {
+  border-left-color: var(--accent-error);
+}
+
+.exp-header {
+  font-weight: bold;
+  color: var(--accent-success);
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+/* 错题解析标题颜色 */
+.explanation.wrong .exp-header {
+  color: var(--accent-error);
+}
+
+.exp-body p {
+  margin-bottom: 8px;
+}
+
+/* 上下题按钮容器 */
+#next-btn-container {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.case-confirm-btn {
+  padding: 10px 20px;
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-weight: 500;
+}
+
+.case-confirm-btn:hover {
+  background-color: var(--accent-secondary);
+}
+
+/* 答题卡弹窗样式 */
+.dashboard-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.dashboard-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.dashboard-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-title {
+  font-size: 1.2rem;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.dashboard-close {
+  background-color: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.dashboard-close:hover {
+  background-color: var(--hover-color);
+  color: var(--accent-error);
+}
+
+.dashboard-legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+}
+
+.dot.correct {
+  background-color: var(--accent-success);
+}
+
+.dot.wrong {
+  background-color: var(--accent-error);
+}
+
+.dot.answered {
+  background-color: var(--accent-secondary);
+}
+
+.dot.empty {
+  background-color: var(--border-color);
+}
+
+.q-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 8px;
+}
+
+.q-grid-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.q-grid-btn:hover {
+  background-color: var(--hover-color);
+}
+
+.q-grid-btn.correct {
+  background-color: var(--accent-success);
+  color: var(--bg-primary);
+  border-color: var(--accent-success);
+}
+
+.q-grid-btn.wrong {
+  background-color: var(--accent-error);
+  color: var(--bg-primary);
+  border-color: var(--accent-error);
+}
+
+.q-grid-btn.answered {
+  background-color: var(--accent-secondary);
+  color: var(--bg-primary);
+  border-color: var(--accent-secondary);
+}
+
+/* 收藏弹窗样式 */
+.collect-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.collect-modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.collect-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.collect-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.collect-title {
+  font-size: 1.2rem;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.collect-close {
+  background-color: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.collect-close:hover {
+  background-color: var(--hover-color);
+  color: var(--accent-error);
+}
+
+.collect-items {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.collect-item {
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 15px;
+  border-left: 4px solid var(--accent-secondary);
+}
+
+/* 响应式适配 - 保持3列布局 */
+@media (max-width: 992px) {
+  #sidebar {
+    transform: translateX(-100%);
+  }
+  
+  #sidebar.active {
+    transform: translateX(0);
+  }
+  
+  #app-main {
+    margin-left: 0;
+  }
+  
+  .menu-toggle {
+    display: block;
+  }
+  
+  /* 始终保持3列 */
+  .section-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  #app-main {
+    padding: 20px 15px;
+  }
+  
+  .github-config input {
+    width: 100%;
+  }
+  
+  .func-buttons {
+    flex-direction: column;
+  }
+  
+  .mode-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .q-grid {
+    grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
+  }
+  
+  .q-grid-btn {
+    width: 35px;
+    height: 35px;
+    font-size: 0.9rem;
+  }
+  
+  /* 始终保持3列 */
+  .section-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  #sidebar {
+    width: 100%;
+  }
+  
+  .q-card {
+    padding: 15px;
+  }
+  
+  /* 小屏依然保持3列（如需调整可改为2列） */
+  .section-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .dashboard-legend {
+    gap: 10px;
+  }
+}
+
+/* 滚动条样式美化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hover-color);
+}
+
+/* 中性选中状态（selected-neutral）- 例如未判分/待复核的选中项 */
+.q-option.selected-neutral {
+  background-color: #414868; /* 中性背景色，匹配主题色系 */
+  border-color: #7dcfff;     /* 天蓝色边框，区分普通选中和错误状态 */
+}
+
+/* 排除选项状态（option-excluded）- 例如已排除的错误选项 */
+.q-option.option-excluded {
+  background-color: rgba(247, 118, 142, 0.1); /* 浅红色背景（半透明） */
+  border-color: #f7768e;                       /* 错误色边框 */
+  opacity: 0.7;                                /* 降低不透明度，视觉上区分 */
+  cursor: not-allowed;                         /* 禁用光标 */
+}
+
+/* 排除状态下禁止hover效果 */
+.q-option.option-excluded:hover {
+  background-color: rgba(247, 118, 142, 0.1);
+  border-color: #f7768e;
+}
+
+/* ==================== 单选圆圈 (radio-circle) 完整样式 ==================== */
+.radio-circle {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-primary);
+  border-radius: 50%; /* 圆形 */
+  margin-right: 15px;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease; /* 过渡动画 */
+}
+
+/* 普通选中状态 */
+.q-option.selected .radio-circle {
+  border-color: var(--accent-primary); /* 选中时边框变色 */
+}
+
+.q-option.selected .radio-circle::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background-color: var(--accent-primary);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* 中性选中状态的圆圈样式 */
+.q-option.selected-neutral .radio-circle {
+  border-color: #7dcfff;
+  background-color: #7dcfff
+}
+
+.q-option.selected-neutral .radio-circle::after {
+  background-color: #7dcfff;
+}
+
+/* 排除/禁用状态 (option-excluded) */
+.q-option.option-excluded .radio-circle {
+  border-color: var(--accent-error);
+  opacity: 0.8;
+}
+
+/* 未选中时隐藏内部圆点 */
+.radio-circle::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background-color: transparent;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+}
+
+/* ==================== 多选方块 (checkbox-square) 完整样式 ==================== */
+.checkbox-square {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-primary);
+  border-radius: 3px; /* 轻微圆角，保持方形 */
+  margin-right: 15px;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease; /* 过渡动画 */
+}
+
+/* 普通选中状态 */
+.q-option.selected .checkbox-square {
+  border-color: var(--accent-primary);
+  background-color: var(--accent-primary);
+}
+
+.q-option.selected .checkbox-square::after {
+  content: '';
+  width: 6px;
+  height: 11px;
+  border-right: 2px solid var(--bg-primary); /* 对勾颜色 */
+  border-bottom: 2px solid var(--bg-primary);
+  position: absolute;
+  top: 1px;
+  left: 5px;
+  transform: rotate(45deg);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+/* 中性选中状态 (selected-neutral) */
+.q-option.selected-neutral .checkbox-square {
+  border-color: #7dcfff;
+  background-color: #7dcfff;
+}
+
+/* 排除/禁用状态 (option-excluded) */
+.q-option.option-excluded .checkbox-square {
+  border-color: var(--accent-error);
+  opacity: 0.8;
+  background-color: transparent; /* 禁用时无背景色 */
+}
+
+/* 未选中时隐藏对勾 */
+.checkbox-square::after {
+  content: '';
+  width: 6px;
+  height: 11px;
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  position: absolute;
+  top: 1px;
+  left: 5px;
+  transform: rotate(45deg);
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+}
+
+/* hover 状态（仅未禁用的选项） */
+.q-option:not(.option-excluded):hover .radio-circle,
+.q-option:not(.option-excluded):hover .checkbox-square {
+  border-color: var(--accent-secondary); /* hover时边框变色 */
+}
