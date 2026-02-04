@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>医学刷题 - 完整版</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="TokyoNightStorm.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
 <body>
@@ -34,7 +34,8 @@
             <p>仓库（如：user/repo）：<input type="text" id="repo" placeholder="owner/repo" /></p>
             <p>Token（私有仓库需要）：<input type="password" id="token" /></p>
             <p>路径（可选）：<input type="text" id="path" placeholder="questions/" /></p>
-            <button id="load-list">加载题目列表</button>
+            <button id="load-list">加载题目列表</button><br/><br/>
+            <button id="toggleStyle">切换风格</button>
             <div id="msg" class="msg"></div>
         </div>
 
@@ -121,6 +122,25 @@
 </div>
 
 <script>
+$(document).ready(function() {
+    $('#toggleStyle').click(function() {
+        var currentStyle = $('link[href$=".css"]').attr('href');
+        var newStyle;
+
+        if (currentStyle.includes('Original.css')) {
+            newStyle = 'TokyoNightStorm.css';
+        } else if (currentStyle.includes('TokyoNightStorm.css')) {
+            newStyle = 'Original.css';
+        } else if (currentStyle.includes('light.css')) {
+            newStyle = 'default.css';
+        } else {
+            newStyle = 'default.css';
+        }
+
+        $('link[href$=".css"]').attr('href', newStyle);
+    });
+});
+
 $(function() {
     // 存储键名
     const STORAGE_KEYS = { 
