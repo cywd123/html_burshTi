@@ -376,40 +376,28 @@ $(function() {
             </div>`;
 
         // 拼接题目卡片HTML
-        const questionHtml = currentMode === 'exam' ? `
-            <div class="q-card" id="q-card">
-                <div class="q-meta">
-                    <span class="q-tag">${q.mode}</span>
-                    <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
-                </div>
-                <div class="q-text">${q.test}</div>
-                <ul class="q-options" id="q-options">${optionsHtml}</ul>
-                <div class="multi-actions">
-                    <button class="multi-check-btn" id="submit-answer">提交答案</button>
-                    <button class="multi-check-btn" style="margin-left:10px;" id="collect-btn">${collectText}</button>
-                    <button class="multi-check-btn" style="margin-left:10px;" id="clear-exclude">清空排除</button>
-                </div>
+        const questionHtml = `<div class="q-card" id="q-card">
+            <div class="q-meta">
+                <span class="q-tag">${q.mode}</span>
+                <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
+            </div><div class="q-text">${q.test}</div>
+            <ul class="q-options" id="q-options">${optionsHtml}</ul>
+            ${currentMode === 'exam' ? `
+            <div class="multi-actions">
+                <button class="multi-check-btn" id="submit-answer">提交答案</button>
+                <button class="multi-check-btn" style="margin-left:10px;" id="collect-btn">${collectText}</button>
+                <button class="multi-check-btn" style="margin-left:10px;" id="clear-exclude">清空排除</button>
+            </div>` 
+            
+            : ''  // 背题模式不显示提交按钮
+            }
+
                 ${analysisHtml}
                 <div id="next-btn-container" style="margin-top:20px;">
-                    <button class="case-confirm-btn" id="prev-btn">上一题</button>
-                    <button class="case-confirm-btn" id="next-btn">下一题</button>
-                </div>
+                <button class="case-confirm-btn" id="prev-btn">上一题</button>
+                <button class="case-confirm-btn" id="next-btn">下一题</button>
             </div>
-        ` : `
-            <div class="q-card" id="q-card">
-                <div class="q-meta">
-                    <span class="q-tag">${q.mode}</span>
-                    <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
-                </div>
-                <div class="q-text">${q.test}</div>
-                <ul class="q-options" id="q-options">${optionsHtml}</ul>
-                ${analysisHtml}
-                <div id="next-btn-container" style="margin-top:20px; ">
-                    <button class="case-confirm-btn" id="prev-btn">上一题</button>
-                    <button class="case-confirm-btn" id="next-btn">下一题</button>
-                </div>
-            </div>
-        `
+        </div>`;
 
         $('#question-content').html(questionHtml);
 
