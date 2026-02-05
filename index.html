@@ -161,6 +161,7 @@ $(function() {
     let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
     let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
     let wrongQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.wrong) || '[]'); // 错题本
+    let correctQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.correct) || '[]'); // 正确题本
     let excludedOptions = [], currentRepoInfo = { repo: '', path: '' };
     let currentStats = JSON.parse(localStorage.getItem(STORAGE_KEYS.stats) || '{"correct":0,"wrong":0,"total":0}');
 
@@ -246,8 +247,8 @@ $(function() {
 
     // 预加载题目
     const preloadQuestions = async (currentIndex) => {
-        const start = Math.max(0, currentIndex - 8);
-        const end = Math.min(fileList.length - 1, currentIndex + 8);
+        const start = Math.max(0, currentIndex - 5);
+        const end = Math.min(fileList.length - 1, currentIndex + 5);
         
         for (let i = start; i <= end; i++) {
             if (!questionCache[fileList[i].name]) {
@@ -268,6 +269,7 @@ $(function() {
             }
         }
         saveCache();
+        renderQuestionSidebar();
     };
 
     // 刷新答题卡
@@ -280,9 +282,11 @@ $(function() {
         fileList.forEach((file, idx) => {
             const isAnswered = finished.includes(file.name);
             const isWrong = wrongQuestions.some(w => w.filename === file.name);
+            const isCorrect = correctQuestions.some(c => c.filename === file.name);
             let cardClass = 'q-grid-btn';
             if (isWrong) cardClass += ' wrong';
-            else if (isAnswered) cardClass += ' answered';
+            else if (isAnswered && !isCorrect) cardClass += ' answered';
+            else if (isCorrect) cardClass += ' correct';
             
             cardHtml += `<button class="${cardClass}" data-idx="${idx}">${idx+1}</button>`;
         });
@@ -355,8 +359,12 @@ $(function() {
         fileList.forEach((file, idx) => {
             const isFinished = finished.includes(file.name);
             const isWrong = wrongQuestions.some(w => w.filename === file.name);
-            const statusText = isWrong ? '[❌]' : isFinished ? '[✅]' : '';
-            html += `<li><button class="section-btn" data-idx="${idx}">${idx + 1} ${statusText}</button></li>`;
+            const isCorrect = correctQuestions.some(c => c.filename === file.name);
+            const isCached = questionCache.hasOwnProperty(file.name);
+            //const isCollected = collected.some(c => c.filename === file.name);
+            const statusText = isWrong ? '[❌]' : isCorrect ? '[✅]' : '' + (isFinished ? '[✔]' : '');
+            const OtherstatusText = (isCached ? '' : '📥') //+ (isCollected ? '⭐' : '');
+            html += `<li><button class="section-btn" data-idx="${idx}">${idx + 1} ${statusText}${OtherstatusText}</button></li>`;
         });
         $('#question-section-list').html(html);
         
@@ -564,6 +572,13 @@ $(function() {
             localStorage.setItem(STORAGE_KEYS.finished, JSON.stringify(finished));
         }
 
+        // 记录正确   
+        const isInCorrect = correctQuestions.some(c => c.filename === currentFile.name);
+        if (isCorrect && !isInCorrect) {
+            correctQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey});
+            localStorage.setItem(STORAGE_KEYS.correct, JSON.stringify(correctQuestions));
+        }
+
         // 记录错题
         const isInWrong = wrongQuestions.some(w => w.filename === currentFile.name);
         if (!isCorrect && !isInWrong) {
@@ -574,6 +589,11 @@ $(function() {
         if (isCorrect && isInWrong) {
             wrongQuestions = wrongQuestions.filter(w => w.filename !== currentFile.name);
             localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
+        }
+        // 错误则移除正确题目记录
+        if (!isCorrect && isInCorrect) {
+            correctQuestions = correctQuestions.filter(c => c.filename !== currentFile.name);
+            localStorage.setItem(STORAGE_KEYS.correct, JSON.stringify(correctQuestions));
         }
 
         // 更新统计
