@@ -175,18 +175,24 @@ $(function() {
     }
 
     // 读URL参数并覆盖本地配置
-    const encodedInfo = new URLSearchParams(window.location.search).get('i');
-    if (encodedInfo) {
+    const repo_from_url = new URLSearchParams(window.location.search).get('r');
+    if (repo_from_url) {
     try {
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(encodedInfo)))));
-        if (decoded && typeof decoded === 'object') {
-        cfg.repo = decoded[0] || cfg.repo;
-        cfg.path = decoded[1] || cfg.path;
-        }
+        cfg.repo = repo_from_url || cfg.repo;
+        
     } catch (e) {
         console.error("Decode URL param failed:", e);
     }
+}
+   
+    const path_from_url = new URLSearchParams(window.location.search).get('p');
+    if (path_from_url) {
+    try {
+        cfg.path = path_from_url || cfg.path;
+    } catch (e) {
+        console.error("Decode URL param failed:", e);
     }
+} 
 
     // 填充表单和全局变量
     $('#repo').val(cfg.repo || '');
@@ -305,7 +311,7 @@ $(function() {
         //Base64 Encode and log the Info object
         console.log('当前仓库信息：', Info);
         // url 添加参数i= base64编码后的Info对象，方便调试使用
-        window.history.replaceState(null, '', `${window.location.pathname}?i=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(Info))))) }`);
+        window.history.replaceState(null, '', `${window.location.pathname}?r=${repo}&p=${path}`);
 
 
         try {
