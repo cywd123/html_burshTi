@@ -180,8 +180,8 @@ $(function() {
     try {
         const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(encodedInfo)))));
         if (decoded && typeof decoded === 'object') {
-        cfg.repo = decoded.repo || cfg.repo;
-        cfg.path = decoded.path || cfg.path;
+        cfg.repo = decoded[0] || cfg.repo;
+        cfg.path = decoded[1] || cfg.path;
         }
     } catch (e) {
         console.error("Decode URL param failed:", e);
@@ -301,7 +301,7 @@ $(function() {
         $(this).prop('disabled', true).html('<span class="loading-spinner"></span> 少女祈祷中⋯⋯');
         
         // 读取repo和path的内容
-        Info={ repo: repo, path: path };
+        Info=[repo,path];
         //Base64 Encode and log the Info object
         console.log('当前仓库信息：', Info);
         // url 添加参数i= base64编码后的Info对象，方便调试使用
