@@ -85,7 +85,8 @@
         <div class="mode-controls" id="mode-controls" style="display:none;">
             <span>刷题模式：</span>
             <button class="mode-btn active" data-mode="recite">背题模式</button>
-            <button class="mode-btn" data-mode="exam">答题模式</button>
+            <button class="mode-btn" data-mode="instant">答题模式</button>
+            <button class="mode-btn" data-mode="exam">考试模式</button>
         </div>
         <div id="msg" class="msg"></div>
         <!-- 题目展示区 -->
@@ -289,8 +290,6 @@ $(function() {
             
             const isAnswered = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === false);
             const isJudged = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true);
-            console.log('Newest_timestamp for', file.name, 'is', Newest_timestamp, 'isAnswered:', isAnswered);
-
             const isCorrect = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true && h.isCorrect === true);
 
 
@@ -450,6 +449,7 @@ $(function() {
 
             $('#next-btn').click(() => loadQuestion(Math.min(idx + 1, fileList.length - 1)));
             $('#prev-btn').click(() => loadQuestion(Math.max(idx - 1, 0)));
+            $('#exam-submit-btn').off('click').click(() => submit_exam());
             // 启动预加载
             preloadQuestions(idx);
         } catch (err) { 
@@ -477,7 +477,7 @@ $(function() {
         const collectText = isCollected ? '取消收藏' : '收藏';
 
         // 解析HTML（区分模式）
-        const analysisHtml = currentMode === 'exam' ? 
+        const analysisHtml = currentMode != 'recite' ? 
             '<div class="explanation" id="analysis"><div class="exp-header">答案解析</div><div class="exp-body"></div></div>' : 
             `<div class="explanation correct" id="analysis" style="display:block;">
                 <div class="exp-header">答案解析</div>
@@ -495,7 +495,7 @@ $(function() {
                 <span>题目 ${fileList.indexOf(currentFile) + 1}/${fileList.length}</span>
             </div><div class="q-text">${q.test}</div>
             <ul class="q-options" id="q-options">${optionsHtml}</ul>
-            ${currentMode === 'exam' ? `
+            ${currentMode != 'recite' ? `
             <div class="multi-actions">
                 <button class="multi-check-btn" id="submit-answer">提交答案</button>
                 <button class="multi-check-btn" style="margin-left:10px;" id="collect-btn">${collectText}</button>
@@ -509,6 +509,7 @@ $(function() {
                 <div id="next-btn-container" style="margin-top:20px;">
                 <button class="case-confirm-btn" id="prev-btn">上一题</button>
                 <button class="case-confirm-btn" id="next-btn">下一题</button>
+                <button class="case-confirm-btn" id="exam-submit-btn" style="${currentMode === 'exam' ? '' : 'display:none;'}">考试交卷</button>
             </div>
         </div>`;
 
@@ -573,24 +574,21 @@ $(function() {
         if (!selectedOption.length) return showMsg('请选择答案', true);
         const isCorrect = selectedKey === q.answer;
 
-        // 标记正确/错误选项
-        $('.q-option').each(function() {
-            const optKey = $(this).data('key');
-            $(this).removeClass('selected-neutral');
-            
-            if (optKey === q.answer) {
-                $(this).addClass('correct-answer');
-            } else if (optKey === selectedKey && !isCorrect) {
-                $(this).addClass('wrong-answer');
-            }
-        });
-
-        // 标记已答题
-        $('#q-options').addClass('answered');
-        $('#q-card').addClass('answered');
-
         // 显示解析（答题模式）
-        if (currentMode === 'exam') {
+        if (currentMode === 'instant' ) {
+        
+            // 标记正确/错误选项
+            $('.q-option').each(function() {
+                const optKey = $(this).data('key');
+                $(this).removeClass('selected-neutral');
+                
+                if (optKey === q.answer) {
+                    $(this).addClass('correct-answer');
+                } else if (optKey === selectedKey && !isCorrect) {
+                    $(this).addClass('wrong-answer');
+                }
+            });
+
             const expClass = isCorrect ? 'correct' : 'wrong';
             const expHeader = isCorrect ? '回答正确 ✔' : '回答错误 ✘';
             const expBody = `
@@ -604,7 +602,9 @@ $(function() {
             $('#analysis .exp-body').html(expBody);
             $('#analysis').show();
         }
-
+        // 标记已答题
+        $('#q-options').addClass('answered');
+        $('#q-card').addClass('answered');
         /*
         // 记录完成状态
         if (!finished.includes(currentFile.name) && false ) {
@@ -638,7 +638,7 @@ $(function() {
 
         */
         // 记录历史
-        history.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey , isCorrect, timestamp: new Date().toISOString(), judged:true });
+        history.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey , isCorrect, timestamp: new Date().toISOString(), judged: currentMode === 'instant'? true : false });
         localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
 
 /*
@@ -694,6 +694,27 @@ $(function() {
             loadQuestion(currentIdx);
         }
     });
+
+    const submit_exam = () => {
+        if (confirm('确定交卷吗？')) {
+            // 遍历所有题目，提交未答题目   isMatchCurrentRepo
+            for (let i = 0; i < history.length; i++) {
+                if(history[i].repo === currentRepoInfo.repo && 
+                   history[i].path === currentRepoInfo.path &&
+                   history[i].judged === false) {
+                    history[i].judged = true;
+                }
+            }
+            // 更新历史记录
+            try { localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history)); } 
+            catch (e) { console.error('缓存保存失败', e); } 
+            showMsg('考试已提交！', false);
+            // 刷新当前题目
+            refreshAnswerCard();
+            renderQuestionSidebar();
+        }
+    };
+
 
     // 导出错题本
     $('#export-wrong').click(function() {
