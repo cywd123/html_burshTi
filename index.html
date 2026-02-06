@@ -153,6 +153,7 @@ $(function() {
         cache: 'jq_questions_cache', 
         wrong: 'jq_wrong_questions',
         correct: 'jq_correct_questions',
+        history: 'jq_history',
         stats: 'jq_stats'
     };
 
@@ -161,11 +162,12 @@ $(function() {
     let currentFile = null, currentMode = 'recite'; // 默认背题模式
     let collected = JSON.parse(localStorage.getItem(STORAGE_KEYS.collected) || '[]');
     let finished = JSON.parse(localStorage.getItem(STORAGE_KEYS.finished) || '[]');
-    let wrongQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.wrong) || '[]'); // 错题本
-    let correctQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.correct) || '[]'); // 正确题本
+    //let wrongQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.wrong) || '[]'); // 错题本
+    //let correctQuestions = JSON.parse(localStorage.getItem(STORAGE_KEYS.correct) || '[]'); // 正确题本
+    let history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]'); // 历史记录
     let excludedOptions = [], currentRepoInfo = { repo: '', path: '' };
     let currentStats = JSON.parse(localStorage.getItem(STORAGE_KEYS.stats) || '{"correct":0,"wrong":0,"total":0}');
-
+    let currentIdx = -1;
 
     // 先读本地配置
     let cfg = {};
@@ -281,13 +283,36 @@ $(function() {
         }
         let cardHtml = '';
         fileList.forEach((file, idx) => {
+
+            const Newest_timestamp   //in History
+                = history.filter(h => h.filename === file.name).map(h => new Date(h.timestamp)).sort((a, b) => b - a)[0]; 
+            
+            const isAnswered = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === false);
+            const isJudged = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true);
+            console.log('Newest_timestamp for', file.name, 'is', Newest_timestamp, 'isAnswered:', isAnswered);
+
+            const isCorrect = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true && h.isCorrect === true);
+
+
+            let cardClass = 'q-grid-btn';
+            if (isAnswered) {
+                cardClass = 'q-grid-btn answered';
+            } else if (isJudged && isCorrect) {
+                cardClass = 'q-grid-btn correct';
+            } else if (isJudged && !isCorrect) {
+                cardClass = 'q-grid-btn wrong';
+            } else {
+                cardClass = 'q-grid-btn';
+            }
+
+            /*
             const isAnswered = finished.includes(file.name);
             const isWrong = wrongQuestions.some(w => w.filename === file.name);
             const isCorrect = correctQuestions.some(c => c.filename === file.name);
             let cardClass = 'q-grid-btn';
             if (isWrong) cardClass += ' wrong';
             else if (isAnswered && !isCorrect) cardClass += ' answered';
-            else if (isCorrect) cardClass += ' correct';
+            else if (isCorrect) cardClass += ' correct';*/
             
             cardHtml += `<button class="${cardClass}" data-idx="${idx}">${idx+1}</button>`;
         });
@@ -357,15 +382,28 @@ $(function() {
     // 渲染侧边栏题目列表
     const renderQuestionSidebar = () => {
         let html = '';
+        let currentIdx= fileList.indexOf(currentFile);
         fileList.forEach((file, idx) => {
+
+            /*
             const isFinished = finished.includes(file.name);
             const isWrong = wrongQuestions.some(w => w.filename === file.name);
             const isCorrect = correctQuestions.some(c => c.filename === file.name);
+            
+            */
+
+            const Newest_timestamp   //in History
+                = history.filter(h => h.filename === file.name).map(h => new Date(h.timestamp)).sort((a, b) => b - a)[0]; 
+            
+            const isAnswered = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === false);
+            const isJudged = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true);
+            const isCorrect = history.some(h => h.filename === file.name && Newest_timestamp && new Date(h.timestamp).getTime() === Newest_timestamp.getTime() && h.judged === true && h.isCorrect === true);
+
             const isCached = questionCache.hasOwnProperty(file.name);
             //const isCollected = collected.some(c => c.filename === file.name);
-            const statusText = isWrong ? '[❌]' : isCorrect ? '[✅]' : '' + (isFinished ? '[✔]' : '');
+            const statusText = isJudged && !isCorrect ? '[❌]' : isJudged && isCorrect ? '[✅]' : '' + (isAnswered ? '[✔]' : '');
             const OtherstatusText = (isCached ? '' : '📥') //+ (isCollected ? '⭐' : '');
-            html += `<li><button class="section-btn" data-idx="${idx}">${idx + 1} ${statusText}${OtherstatusText}</button></li>`;
+            html += `<li><button class="section-btn ${idx === currentIdx ? 'active' : ''}" data-idx="${idx}">${idx + 1} ${statusText}${OtherstatusText}</button></li>`;
         });
         $('#question-section-list').html(html);
         
@@ -567,23 +605,24 @@ $(function() {
             $('#analysis').show();
         }
 
+        /*
         // 记录完成状态
-        if (!finished.includes(currentFile.name)) {
+        if (!finished.includes(currentFile.name) && false ) {
             finished.push(currentFile.name);
             localStorage.setItem(STORAGE_KEYS.finished, JSON.stringify(finished));
         }
 
         // 记录正确   
         const isInCorrect = correctQuestions.some(c => c.filename === currentFile.name);
-        if (isCorrect && !isInCorrect) {
-            correctQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey});
+        if (isCorrect) {
+            correctQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey,timestamp: new Date().toISOString() });
             localStorage.setItem(STORAGE_KEYS.correct, JSON.stringify(correctQuestions));
         }
 
         // 记录错题
         const isInWrong = wrongQuestions.some(w => w.filename === currentFile.name);
-        if (!isCorrect && !isInWrong) {
-            wrongQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey });
+        if (!isCorrect) {
+            wrongQuestions.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey ,timestamp: new Date().toISOString() });
             localStorage.setItem(STORAGE_KEYS.wrong, JSON.stringify(wrongQuestions));
         }
         // 正确则移除错题
@@ -597,6 +636,12 @@ $(function() {
             localStorage.setItem(STORAGE_KEYS.correct, JSON.stringify(correctQuestions));
         }
 
+        */
+        // 记录历史
+        history.push({ filename: currentFile.name, repo: currentRepoInfo.repo, path: currentRepoInfo.path, ...q, userAnswer: selectedKey , isCorrect, timestamp: new Date().toISOString(), judged:true });
+        localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
+
+/*
         // 更新统计
         if (!isCorrect && !isInWrong) {
             currentStats.wrong++;
@@ -607,6 +652,8 @@ $(function() {
             currentStats.correct++;
         }
         currentStats.total = fileList.length;
+
+        */
         saveStats();
         updateStatsDisplay();
 
@@ -736,7 +783,7 @@ $(function() {
             Object.keys(STORAGE_KEYS).forEach(key => localStorage.removeItem(STORAGE_KEYS[key]));
             collected = []; 
             finished = []; 
-            wrongQuestions = []; 
+            //wrongQuestions = []; 
             questionCache = {}; 
             excludedOptions = [];
             currentStats = { correct: 0, wrong: 0, total: 0 };
